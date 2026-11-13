@@ -485,6 +485,11 @@ function App() {
       return;
     }
 
+    if (openingBalance >= 10_000_000_000_000) {
+      notify("Saldo maksimal adalah Rp9.999.999.999.999");
+      return;
+    }
+
     const openingBalance = Number(balance);
 
     if (!Number.isFinite(openingBalance) || openingBalance < 0) {
