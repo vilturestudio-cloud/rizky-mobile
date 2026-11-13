@@ -497,8 +497,8 @@ function App() {
       return;
     }
 
-    if (!isCloudReady || !userId) {
-      notify("Koneksi cloud belum siap. Coba lagi sebentar.");
+    if (openingBalance >= 10_000_000_000_000) {
+      notify("Saldo maksimal adalah Rp9.999.999.999.999");
       return;
     }
 
