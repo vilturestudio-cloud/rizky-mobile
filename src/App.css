@@ -2391,3 +2391,35 @@ button:disabled {
   background: #35d6c4 !important;
   color: #090c0f !important;
 }
+
+/* MOBILE — FULL WIDTH FIX */
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.phone-shell {
+  width: 100% !important;
+  max-width: 480px;
+  min-height: 100dvh;
+  margin: 0 auto !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+.app-screen {
+  width: 100%;
+  min-width: 0;
+}
