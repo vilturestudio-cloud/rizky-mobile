@@ -1802,8 +1802,8 @@ button {
 }
 
 .cards-section {
-  margin-top: 0;
-  padding: 23px 0 22px;
+  margin: 0 -22px;
+  padding: 23px 22px 22px;
   border-bottom: 1px solid var(--vf-line);
 }
 
@@ -1878,9 +1878,11 @@ button {
 /* TRANSACTION SHORTCUTS */
 
 .transaction-shortcuts {
-  margin: 0;
-  padding: 17px 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 0;
+  margin: 0 -23px;
+  padding: 0;
   border-bottom: 1px solid var(--vf-line);
 }
 
@@ -1893,8 +1895,13 @@ button {
   font-weight: 600;
 }
 
-.transaction-shortcuts button:not(:last-child) {
+.transaction-shortcuts button:nth-child(3n + 1),
+.transaction-shortcuts button:nth-child(3n + 2) {
   border-right: 1px solid var(--vf-line);
+}
+
+.transaction-shortcuts button:nth-child(-n + 3) {
+  border-bottom: 1px solid var(--vf-line);
 }
 
 .shortcut-icon {
@@ -1915,8 +1922,8 @@ button {
 /* TOTAL ASSETS */
 
 .total-section {
-  margin: 0;
-  padding: 24px 0 23px;
+  margin: 0 -22px;
+  padding: 24px 22px 23px;
   text-align: center;
   border-bottom: 1px solid var(--vf-line-strong);
 }
@@ -2390,4 +2397,353 @@ button:disabled {
 .bottom-nav .scan-nav-button > span {
   background: #35d6c4 !important;
   color: #090c0f !important;
+}
+
+/* TRANSACTION MANAGEMENT */
+
+.transaction-item {
+  gap: 10px;
+}
+
+.transaction-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.transaction-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.transaction-actions button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--vf-muted);
+  cursor: pointer;
+}
+
+.transaction-actions button:hover {
+  color: var(--vf-accent);
+  border-color: var(--vf-accent);
+}
+
+.transaction-actions .transaction-delete-action:hover {
+  color: var(--vf-danger);
+  border-color: var(--vf-danger);
+}
+
+#transaction-date {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: var(--vf-surface);
+  color: var(--vf-text);
+  font: inherit;
+}
+
+/* DELETE TRANSACTION CONFIRMATION */
+
+.delete-confirm-modal {
+  position: relative;
+}
+
+.delete-warning-icon {
+  width: 58px;
+  height: 58px;
+  margin: 24px auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  color: #ff6262;
+  background: rgba(255, 75, 75, 0.12);
+  border: 1px solid rgba(255, 75, 75, 0.2);
+}
+
+.delete-confirm-description {
+  color: #92929e;
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+  margin: 0 0 20px;
+}
+
+.delete-transaction-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 16px;
+  margin-bottom: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.delete-transaction-preview span {
+  color: #858593;
+  font-size: 11px;
+}
+
+.delete-transaction-preview strong {
+  color: #f0f0f4;
+  font-size: 14px;
+}
+
+.delete-transaction-preview b {
+  font-size: 16px;
+  margin-top: 3px;
+}
+
+.delete-transaction-preview b.income {
+  color: #4bd5a0;
+}
+
+.delete-transaction-preview b.expense {
+  color: #ff7777;
+}
+
+.delete-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.delete-confirm-actions button {
+  min-height: 46px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.delete-cancel-button {
+  color: #d0d0d8;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.delete-confirm-button {
+  color: #fff;
+  background: #d94747;
+  border: 1px solid #d94747;
+}
+
+.delete-confirm-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.delete-cancel-button:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.delete-confirm-button:not(:disabled):hover {
+  background: #f05252;
+}
+
+/* ACCOUNT ACTIONS */
+
+.account-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.edit-account-button {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #a8a8b8;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.edit-account-button:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.account-actions .delete-button {
+  flex-shrink: 0;
+}
+
+/* ================================
+   CATEGORY MANAGEMENT
+================================ */
+
+.category-group {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.category-group > .eyebrow {
+  margin-bottom: 12px;
+  letter-spacing: 1.5px;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.55;
+}
+
+.category-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.category-manager .section-heading {
+  margin-bottom: 12px;
+}
+
+.category-group .settings-row {
+  min-height: 54px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.category-group .settings-row > span {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.category-group .account-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-group .edit-account-button,
+.category-group .delete-button {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.category-group .edit-account-button {
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  background: transparent;
+}
+
+.category-group .delete-button {
+  border: 1px solid rgba(255, 90, 90, 0.18);
+  background: rgba(255, 90, 90, 0.06);
+  color: #ff7373;
+}
+
+.category-group .edit-account-button:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.category-group .delete-button:hover {
+  background: rgba(255, 90, 90, 0.15);
+}
+
+.category-group .subheading {
+  padding: 8px 0;
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+/* CATEGORY HEADER */
+
+.category-group .section-heading,
+.secondary-page > .section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.secondary-page > .section-heading h1 {
+  margin-bottom: 6px;
+}
+
+.secondary-page > .section-heading .subheading {
+  margin-top: 0;
+}
+
+/* CATEGORY MODAL */
+
+.account-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-modal form label {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.account-modal form input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.account-modal form .type-switch {
+  margin-bottom: 12px;
+}
+
+.account-modal form .full-button {
+  margin-top: 8px;
+}
+
+.account-modal .modal-heading {
+  margin-bottom: 20px;
+}
+
+.account-modal .modal-heading h2 {
+  margin-bottom: 0;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 480px) {
+  .category-group {
+    margin-top: 22px;
+    padding-top: 16px;
+  }
+
+  .category-group .settings-row {
+    min-height: 50px;
+  }
+
+  .category-group .account-actions {
+    gap: 6px;
+  }
+
+  .category-group .edit-account-button,
+  .category-group .delete-button {
+    width: 32px;
+    height: 32px;
+  }
 }
