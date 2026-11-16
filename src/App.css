@@ -3582,3 +3582,300 @@ button:disabled {
 .budget-detail-page .section-block {
   margin-top: 0px;
 }
+
+/* =================================
+   RECEIPT SCANNER CAMERA OVERLAY
+================================= */
+.scan-camera-overlay {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  width: 100%;
+  max-width: 480px;
+  height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #090909;
+  color: #fff;
+  isolation: isolate;
+}
+
+.scan-camera-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #111;
+}
+
+.scan-camera-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.62),
+    transparent 25%,
+    transparent 65%,
+    rgba(0, 0, 0, 0.72)
+  );
+}
+
+.scan-camera-header {
+  position: absolute;
+  z-index: 2;
+  top: max(18px, env(safe-area-inset-top));
+  left: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scan-camera-icon {
+  width: 43px;
+  height: 43px;
+  flex: 0 0 43px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(20, 20, 20, 0.48);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+}
+
+.scan-camera-icon.flash-on {
+  color: #20211f;
+  background: #f4d77b;
+}
+
+.scan-camera-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.scan-camera-heading strong {
+  font-size: 14px;
+  letter-spacing: 0.2px;
+}
+.scan-camera-heading span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+}
+
+.scan-guide-wrap {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 25px;
+  right: 25px;
+  transform: translateY(-52%);
+  text-align: center;
+}
+
+.scan-guide-frame {
+  position: relative;
+  width: 100%;
+  height: min(58vh, 470px);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 12px;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.13);
+}
+
+.scan-guide-frame span {
+  position: absolute;
+  width: 27px;
+  height: 27px;
+  border-color: #fff;
+  border-style: solid;
+}
+.scan-guide-frame span:nth-child(1) {
+  top: -2px;
+  left: -2px;
+  border-width: 3px 0 0 3px;
+  border-radius: 9px 0 0;
+}
+.scan-guide-frame span:nth-child(2) {
+  top: -2px;
+  right: -2px;
+  border-width: 3px 3px 0 0;
+  border-radius: 0 9px 0 0;
+}
+.scan-guide-frame span:nth-child(3) {
+  bottom: -2px;
+  left: -2px;
+  border-width: 0 0 3px 3px;
+  border-radius: 0 0 0 9px;
+}
+.scan-guide-frame span:nth-child(4) {
+  bottom: -2px;
+  right: -2px;
+  border-width: 0 3px 3px 0;
+  border-radius: 0 0 9px;
+}
+
+.scan-guide-wrap p {
+  margin: 17px 0 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  text-shadow: 0 1px 5px #000;
+}
+
+.scan-camera-controls {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: max(28px, calc(env(safe-area-inset-bottom) + 16px));
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 32px;
+}
+
+.scan-gallery-button {
+  min-width: 60px;
+  min-height: 58px;
+  padding: 7px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 13px;
+  color: #fff;
+  background: rgba(35, 35, 35, 0.72);
+  font-size: 10px;
+  cursor: pointer;
+}
+.scan-gallery-button small {
+  font-size: 9px;
+}
+
+.scan-shutter {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+}
+.scan-shutter span {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #fff;
+}
+.scan-shutter:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.scan-camera-spacer {
+  width: 60px;
+}
+.scan-hidden-input {
+  display: none;
+}
+
+.scan-camera-error {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 28px;
+  right: 28px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.scan-camera-error strong {
+  font-size: 15px;
+}
+.scan-camera-error p {
+  margin: 0 0 5px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.scan-processing-overlay {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 10, 10, 0.58);
+  backdrop-filter: blur(7px);
+}
+.scan-processing-card {
+  width: min(100%, 310px);
+  padding: 27px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid #e9e9e4;
+  border-radius: 18px;
+  background: #fafaf8;
+  color: #242420;
+  text-align: center;
+}
+.scan-processing-card strong {
+  font-size: 14px;
+}
+.scan-processing-card span {
+  color: #777770;
+  font-size: 11px;
+}
+.scan-processing-card small {
+  color: #999992;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.scan-processing-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e4e4dd;
+  border-top-color: #252621;
+  border-radius: 50%;
+  animation: scan-spin 0.8s linear infinite;
+}
+.scan-progress-track {
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #e8e8e2;
+}
+.scan-progress-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #292a25;
+  transition: width 0.2s ease;
+}
+@keyframes scan-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (min-width: 481px) {
+  .scan-camera-overlay {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}

@@ -4,6 +4,9 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Bell,
+  Camera,
+  ImagePlus,
+  Zap,
   ChevronRight,
   CreditCard,
   Home,
@@ -19,6 +22,7 @@ import {
   Trash2,
 } from "lucide-react";
 import "./App.css";
+import { createWorker } from "tesseract.js";
 import { ensureAnonymousSession, supabase } from "./supabase";
 
 type Account = {
@@ -254,6 +258,15 @@ function App() {
   >(null);
   const [toast, setToast] = useState("");
   const swipeStartX = useRef<number | null>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [showScanCamera, setShowScanCamera] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [flashEnabled, setFlashEnabled] = useState(false);
+  const [flashAvailable, setFlashAvailable] = useState(false);
+  const [isReadingReceipt, setIsReadingReceipt] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
   const [isCloudReady, setIsCloudReady] = useState(false);
   const [cloudError, setCloudError] = useState("");
@@ -1822,9 +1835,215 @@ function App() {
   };
 
   const handleTab = (tab: string) => {
+    if (tab === "Scan") {
+      if (!selectedAccount) {
+        notify("Tambahkan atau pilih rekening terlebih dahulu");
+        return;
+      }
+      setCameraError("");
+      setShowScanCamera(true);
+      return;
+    }
     setActiveTab(tab);
-    if (tab === "Scan")
-      notify("Fitur scan struk akan kita aktifkan berikutnya");
+  };
+
+  const closeScanCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    setFlashEnabled(false);
+    setFlashAvailable(false);
+    setShowScanCamera(false);
+  };
+
+  // Kamera belakang perangkat. Torch hanya aktif pada browser/perangkat yang mendukungnya.
+  useEffect(() => {
+    if (!showScanCamera) return;
+
+    let cancelled = false;
+    const startCamera = async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("Browser ini belum mendukung akses kamera.");
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        cameraStreamRef.current = stream;
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          await cameraVideoRef.current.play();
+        }
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track?.getCapabilities() as
+          | (MediaTrackCapabilities & { torch?: boolean })
+          | undefined;
+        setFlashAvailable(Boolean(capabilities?.torch));
+      } catch (error) {
+        console.error("Camera error:", error);
+        if (!cancelled) {
+          setCameraError(
+            error instanceof Error
+              ? error.message
+              : "Kamera tidak dapat dibuka. Periksa izin kamera perangkat.",
+          );
+        }
+      }
+    };
+
+    startCamera();
+    return () => {
+      cancelled = true;
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    };
+  }, [showScanCamera]);
+
+  const toggleCameraFlash = async () => {
+    const track = cameraStreamRef.current?.getVideoTracks()[0];
+    if (!track || !flashAvailable) {
+      notify("Flash tidak didukung oleh perangkat atau browser ini");
+      return;
+    }
+    const nextValue = !flashEnabled;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: nextValue } as MediaTrackConstraintSet],
+      });
+      setFlashEnabled(nextValue);
+    } catch (error) {
+      console.error("Flash error:", error);
+      notify("Flash tidak dapat diaktifkan pada perangkat ini");
+    }
+  };
+
+  const readReceiptImage = async (file: File) => {
+    closeScanCamera();
+    setIsReadingReceipt(true);
+    setOcrProgress(0);
+    notify("Sedang membaca struk...");
+    let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
+    try {
+      worker = await createWorker("eng+ind", 1, {
+        logger: (message) => {
+          if (message.status === "recognizing text") {
+            setOcrProgress(Math.round(message.progress * 100));
+          }
+        },
+      });
+      const result = await worker.recognize(file);
+      const rawText = result.data.text || "";
+      const lines = rawText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      // Dahulukan baris total/tagihan agar tidak salah mengambil nomor telepon atau invoice.
+      const totalLines = lines.filter((line) =>
+        /total|grand\s*total|jumlah|tagihan|amount|bayar|payment|nett|net\s*pay/i.test(
+          line,
+        ),
+      );
+      const collectAmounts = (text: string) =>
+        [...text.matchAll(/(?:rp\.?\s*)?([0-9][0-9.,]{2,})/gi)]
+          .map((match) => Number(match[1].replace(/[.,]/g, "")))
+          .filter(
+            (value) =>
+              Number.isFinite(value) && value >= 100 && value <= 100_000_000,
+          );
+      const preferredAmounts = collectAmounts(totalLines.join(" "));
+      const amountCandidates = preferredAmounts.length
+        ? preferredAmounts
+        : collectAmounts(rawText);
+      const detectedAmount = amountCandidates.length
+        ? Math.max(...amountCandidates)
+        : null;
+
+      const dateMatch = rawText.match(
+        /\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\b/,
+      );
+      let detectedDate = toLocalDateOnly(new Date());
+      if (dateMatch) {
+        const day = dateMatch[1].padStart(2, "0");
+        const month = dateMatch[2].padStart(2, "0");
+        let year = dateMatch[3];
+        if (year.length === 2) year = `20${year}`;
+        detectedDate = `${year}-${month}-${day}`;
+      }
+
+      const ignored =
+        /^(total|subtotal|tax|ppn|cash|change|kembalian|tunai|debit|credit|tanggal|date|time|jam|invoice|receipt|struk|no\.?|telp|phone)/i;
+      const detectedTitle = lines.find(
+        (line) =>
+          line.length > 2 && !ignored.test(line) && !/[0-9]{5,}/.test(line),
+      );
+
+      setTransactionType("expense");
+      setTransactionCategory(
+        categories.find((category) => category.type === "expense")?.name ?? "",
+      );
+      setTransactionTitle(
+        detectedTitle?.slice(0, 80) ?? "Pembelian dari struk",
+      );
+      setTransactionAmount(detectedAmount ? String(detectedAmount) : "");
+      setTransactionDate(detectedDate);
+      setEditingTransactionId(null);
+      setShowTransactionModal(true);
+
+      if (detectedAmount) {
+        notify("Struk terbaca. Periksa kembali data sebelum menyimpan.");
+      } else {
+        notify("Teks terbaca, tetapi nominal belum terdeteksi. Isi manual ya.");
+      }
+    } catch (error) {
+      console.error("Receipt OCR error:", error);
+      notify("Gagal membaca gambar. Coba foto yang lebih jelas.");
+    } finally {
+      if (worker) await worker.terminate();
+      setIsReadingReceipt(false);
+      setOcrProgress(0);
+    }
+  };
+
+  const captureReceipt = async () => {
+    const video = cameraVideoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      notify("Kamera belum siap. Coba beberapa saat lagi.");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      notify("Gagal mengambil gambar dari kamera");
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          notify("Gagal memproses foto");
+          return;
+        }
+        const file = new File([blob], `receipt-${Date.now()}.jpg`, {
+          type: "image/jpeg",
+        });
+        void readReceiptImage(file);
+      },
+      "image/jpeg",
+      0.92,
+    );
+  };
+
+  const handleGalleryImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) void readReceiptImage(file);
   };
 
   const getOption = (name: string) =>
@@ -4403,6 +4622,117 @@ function App() {
             >
               {isSavingContribution ? "Saving..." : "Save Contribution"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {showScanCamera && (
+        <section
+          className="scan-camera-overlay"
+          aria-label="Scan receipt camera"
+        >
+          <video
+            ref={cameraVideoRef}
+            className="scan-camera-video"
+            autoPlay
+            playsInline
+            muted
+          />
+          <div className="scan-camera-shade" />
+          <header className="scan-camera-header">
+            <button
+              type="button"
+              className="scan-camera-icon"
+              onClick={closeScanCamera}
+              aria-label="Tutup kamera"
+            >
+              <X size={22} />
+            </button>
+            <div className="scan-camera-heading">
+              <strong>Scan receipt</strong>
+              <span>Posisikan struk di dalam bingkai</span>
+            </div>
+            <button
+              type="button"
+              className={`scan-camera-icon ${flashEnabled ? "flash-on" : ""}`}
+              onClick={toggleCameraFlash}
+              aria-label="Toggle flash"
+              title={flashAvailable ? "Flash" : "Flash tidak tersedia"}
+            >
+              <Zap size={20} />
+            </button>
+          </header>
+
+          {cameraError ? (
+            <div className="scan-camera-error">
+              <Camera size={32} />
+              <strong>Kamera belum dapat dibuka</strong>
+              <p>
+                {cameraError} Pastikan izin kamera aktif dan aplikasi dibuka
+                melalui HTTPS.
+              </p>
+              <button
+                type="button"
+                className="scan-gallery-button"
+                onClick={() => galleryInputRef.current?.click()}
+              >
+                <ImagePlus size={18} /> Pilih dari galeri
+              </button>
+            </div>
+          ) : (
+            <div className="scan-guide-wrap">
+              <div className="scan-guide-frame">
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              <p>Pastikan seluruh bagian struk terlihat jelas</p>
+            </div>
+          )}
+
+          <div className="scan-camera-controls">
+            <button
+              type="button"
+              className="scan-gallery-button"
+              onClick={() => galleryInputRef.current?.click()}
+            >
+              <ImagePlus size={21} />
+              <small>Galeri</small>
+            </button>
+            <button
+              type="button"
+              className="scan-shutter"
+              onClick={captureReceipt}
+              disabled={Boolean(cameraError)}
+              aria-label="Ambil foto struk"
+            >
+              <span />
+            </button>
+            <div className="scan-camera-spacer" />
+          </div>
+          <input
+            ref={galleryInputRef}
+            className="scan-hidden-input"
+            type="file"
+            accept="image/*"
+            onChange={handleGalleryImage}
+          />
+        </section>
+      )}
+
+      {isReadingReceipt && (
+        <div className="scan-processing-overlay">
+          <div className="scan-processing-card">
+            <div className="scan-processing-spinner" />
+            <strong>Membaca struk...</strong>
+            <span>Memproses teks {ocrProgress}%</span>
+            <div className="scan-progress-track">
+              <i style={{ width: `${ocrProgress}%` }} />
+            </div>
+            <small>
+              Pemrosesan dilakukan di perangkat. Tidak memakai API berbayar.
+            </small>
           </div>
         </div>
       )}
