@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Activity,
   ArrowDownLeft,
+  ArrowDownUp,
   ArrowUpRight,
   Bell,
   Camera,
@@ -48,6 +49,15 @@ type Transaction = {
   amount: number;
   type: "income" | "expense";
   date: string;
+};
+
+type AccountTransfer = {
+  id: string;
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  description: string;
+  transferDate: string;
 };
 
 type Category = {
@@ -149,6 +159,18 @@ function App() {
     readStorage<Transaction[]>(TRANSACTION_KEY, []),
   );
 
+  const [transfers, setTransfers] = useState<AccountTransfer[]>([]);
+
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferFromId, setTransferFromId] = useState("");
+  const [transferToId, setTransferToId] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferDescription, setTransferDescription] = useState("");
+  const [transferDate, setTransferDate] = useState(() =>
+    toLocalDateOnly(new Date()),
+  );
+  const [isSavingTransfer, setIsSavingTransfer] = useState(false);
+
   const [accounts, setAccounts] = useState<Account[]>(() => {
     const storedAccounts = readStorage<StoredAccount[]>(ACCOUNT_KEY, []);
     const storedTransactions = readStorage<Transaction[]>(TRANSACTION_KEY, []);
@@ -247,6 +269,8 @@ function App() {
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [transactionToDelete, setTransactionToDelete] =
+    useState<Transaction | null>(null);
+  const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
 
   const [isDeletingTransaction, setIsDeletingTransaction] = useState(false);
@@ -585,6 +609,37 @@ function App() {
     };
   });
 
+  useEffect(() => {
+    if (!isCloudReady || !userId) return;
+
+    const loadTransfers = async () => {
+      const { data, error } = await supabase
+        .from("account_transfers")
+        .select("*")
+        .eq("user_id", userId)
+        .order("transfer_date", { ascending: false });
+
+      if (error) {
+        console.error("Load transfers error:", error);
+        notify("Gagal memuat riwayat transfer");
+        return;
+      }
+
+      setTransfers(
+        (data ?? []).map((item) => ({
+          id: item.id,
+          fromAccountId: item.from_account_id,
+          toAccountId: item.to_account_id,
+          amount: Number(item.amount),
+          description: item.description ?? "",
+          transferDate: item.transfer_date,
+        })),
+      );
+    };
+
+    loadTransfers();
+  }, [isCloudReady, userId]);
+
   const selectedBudget = budgetOverview.find(
     (budget) => budget.id === selectedBudgetId,
   );
@@ -663,11 +718,24 @@ function App() {
           0,
         );
 
-      result[account.id] = account.openingBalance + transactionNet;
+      const transferNet = transfers.reduce((total, transfer) => {
+        if (transfer.fromAccountId === account.id) {
+          return total - transfer.amount;
+        }
+
+        if (transfer.toAccountId === account.id) {
+          return total + transfer.amount;
+        }
+
+        return total;
+      }, 0);
+
+      result[account.id] =
+        account.openingBalance + transactionNet + transferNet;
 
       return result;
     }, {});
-  }, [accounts, transactions]);
+  }, [accounts, transactions, transfers]);
 
   const getAccountBalance = (accountId: string) =>
     accountBalances[accountId] ?? 0;
@@ -1591,6 +1659,113 @@ function App() {
     }
   };
 
+  const openTransferModal = () => {
+    if (accounts.length < 2) {
+      notify("Minimal harus ada 2 rekening untuk transfer");
+      return;
+    }
+
+    const sourceId =
+      selectedId && accounts.some((item) => item.id === selectedId)
+        ? selectedId
+        : accounts[0].id;
+
+    const destinationId =
+      accounts.find((item) => item.id !== sourceId)?.id ?? "";
+
+    setTransferFromId(sourceId);
+    setTransferToId(destinationId);
+    setTransferAmount("");
+    setTransferDescription("");
+    setTransferDate(toLocalDateOnly(new Date()));
+    setShowTransferModal(true);
+  };
+
+  const closeTransferModal = () => {
+    if (isSavingTransfer) return;
+
+    setShowTransferModal(false);
+    setTransferAmount("");
+    setTransferDescription("");
+  };
+
+  const saveTransfer = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!isCloudReady || !userId) {
+      notify("Koneksi cloud belum siap");
+      return;
+    }
+
+    if (!transferFromId || !transferToId) {
+      notify("Pilih rekening asal dan tujuan");
+      return;
+    }
+
+    if (transferFromId === transferToId) {
+      notify("Rekening asal dan tujuan tidak boleh sama");
+      return;
+    }
+
+    const amount = Number(transferAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      notify("Nominal transfer tidak valid");
+      return;
+    }
+
+    if (amount > getAccountBalance(transferFromId)) {
+      notify("Saldo rekening asal tidak mencukupi");
+      return;
+    }
+
+    setIsSavingTransfer(true);
+
+    try {
+      const payload = {
+        user_id: userId,
+        from_account_id: transferFromId,
+        to_account_id: transferToId,
+        amount,
+        description: transferDescription.trim(),
+        transfer_date: transferDate,
+      };
+
+      const { data, error } = await supabase
+        .from("account_transfers")
+        .insert(payload)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      const newTransfer: AccountTransfer = {
+        id: data.id,
+        fromAccountId: data.from_account_id,
+        toAccountId: data.to_account_id,
+        amount: Number(data.amount),
+        description: data.description ?? "",
+        transferDate: data.transfer_date,
+      };
+
+      setTransfers((current) => [newTransfer, ...current]);
+
+      setSelectedId(transferFromId);
+      setShowTransferModal(false);
+
+      notify("Transfer berhasil disimpan");
+    } catch (error) {
+      console.error("Save transfer error:", error);
+      notify(
+        error instanceof Error
+          ? `Transfer gagal: ${error.message}`
+          : "Transfer gagal disimpan",
+      );
+    } finally {
+      setIsSavingTransfer(false);
+    }
+  };
+
   const addTransaction = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -1723,6 +1898,14 @@ function App() {
     setTransactionDate(toLocalDateOnly(new Date().toISOString()));
   };
 
+  const openTransactionDetail = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+  };
+
+  const closeTransactionDetail = () => {
+    setSelectedTransaction(null);
+  };
+
   const openEditTransaction = (transaction: Transaction) => {
     setEditingTransactionId(transaction.id);
     setTransactionTitle(transaction.title);
@@ -1731,6 +1914,7 @@ function App() {
     setTransactionType(transaction.type);
     setTransactionDate(toLocalDateOnly(transaction.date));
     setSelectedId(transaction.accountId);
+    setSelectedTransaction(null);
     setShowTransactionModal(true);
   };
 
@@ -1925,62 +2109,155 @@ function App() {
     closeScanCamera();
     setIsReadingReceipt(true);
     setOcrProgress(0);
-    notify("Sedang membaca struk...");
+    notify("Sedang meningkatkan kualitas gambar dan membaca struk...");
+
     let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
+
     try {
+      // Siapkan gambar beresolusi lebih tinggi, grayscale, dan kontras yang
+      // ditingkatkan agar teks struk tipis lebih mudah dikenali OCR.
+      const sourceImage = await createImageBitmap(file);
+      const maxWidth = 2400;
+      const scale = Math.min(2, maxWidth / sourceImage.width);
+      const width = Math.max(1, Math.round(sourceImage.width * scale));
+      const height = Math.max(1, Math.round(sourceImage.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Tidak dapat memproses gambar struk");
+
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, width, height);
+      context.drawImage(sourceImage, 0, 0, width, height);
+      sourceImage.close();
+
+      const imageData = context.getImageData(0, 0, width, height);
+      const pixels = imageData.data;
+      for (let index = 0; index < pixels.length; index += 4) {
+        const gray =
+          0.299 * pixels[index] +
+          0.587 * pixels[index + 1] +
+          0.114 * pixels[index + 2];
+        // Kontras lembut, tanpa threshold keras yang dapat menghilangkan
+        // karakter tipis pada kertas thermal.
+        const enhanced = Math.max(0, Math.min(255, (gray - 128) * 1.35 + 128));
+        pixels[index] = enhanced;
+        pixels[index + 1] = enhanced;
+        pixels[index + 2] = enhanced;
+      }
+      context.putImageData(imageData, 0, 0);
+
       worker = await createWorker("eng+ind", 1, {
         logger: (message) => {
           if (message.status === "recognizing text") {
-            setOcrProgress(Math.round(message.progress * 100));
+            setOcrProgress(Math.min(95, Math.round(message.progress * 90)));
+          } else if (message.status === "loading language traineddata") {
+            setOcrProgress(Math.min(20, Math.round(message.progress * 20)));
           }
         },
       });
-      const result = await worker.recognize(file);
-      const rawText = result.data.text || "";
+
+      // Bandingkan OCR dari gambar asli yang diperbesar dan gambar yang
+      // sudah ditingkatkan kontrasnya. Pilih hasil dengan confidence terbaik.
+      const originalResult = await worker.recognize(file);
+      setOcrProgress(48);
+      const enhancedResult = await worker.recognize(canvas);
+      const originalConfidence = originalResult.data.confidence ?? 0;
+      const enhancedConfidence = enhancedResult.data.confidence ?? 0;
+      const rawText =
+        enhancedConfidence >= originalConfidence
+          ? enhancedResult.data.text || ""
+          : originalResult.data.text || "";
+
+      setOcrProgress(96);
       const lines = rawText
         .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean);
+        .map((line) => line.replace(/[|]/g, "I").replace(/\s+/g, " ").trim())
+        .filter((line) => line.length > 1);
 
-      // Dahulukan baris total/tagihan agar tidak salah mengambil nomor telepon atau invoice.
-      const totalLines = lines.filter((line) =>
-        /total|grand\s*total|jumlah|tagihan|amount|bayar|payment|nett|net\s*pay/i.test(
-          line,
-        ),
+      const normalizeAmount = (value: string) => {
+        const digits = value.replace(/[^0-9]/g, "");
+        const amount = Number(digits);
+        return Number.isFinite(amount) && amount >= 100 && amount <= 100_000_000
+          ? amount
+          : null;
+      };
+
+      const amountPattern = /(?:rp\s*\.?\s*)?([0-9][0-9\s.,]{1,})/i;
+      const amountCandidates: { amount: number; score: number }[] = [];
+      const totalKeyword =
+        /grand\s*total|total\s*bayar|total\s*payment|amount\s*paid|net\s*pay|nett|total|jumlah|tagihan|bayar|payment/i;
+      const negativeKeyword =
+        /subtotal|sub\s*total|tax|ppn|pajak|discount|diskon|change|kembalian|cash|tunai|debit|credit|no\.?\s*transaksi|invoice/i;
+
+      lines.forEach((line, index) => {
+        const relevantLines = [line, lines[index + 1] ?? ""].join(" ");
+        const matches = [
+          ...relevantLines.matchAll(new RegExp(amountPattern.source, "gi")),
+        ];
+        for (const match of matches) {
+          const amount = normalizeAmount(match[1]);
+          if (!amount) continue;
+          let score = 0;
+          if (totalKeyword.test(line)) score += 10;
+          if (/grand\s*total|total\s*bayar|amount\s*paid|net\s*pay/i.test(line))
+            score += 5;
+          if (/rp\s*\.?/i.test(match[0])) score += 2;
+          if (negativeKeyword.test(line) && !totalKeyword.test(line))
+            score -= 8;
+          if (index >= lines.length - 5) score += 1;
+          amountCandidates.push({ amount, score });
+        }
+      });
+
+      // Jika label total tidak terbaca, ambil nominal terbesar dari baris
+      // bagian bawah struk sebagai tebakan dengan confidence lebih rendah.
+      const rankedAmounts = amountCandidates.sort(
+        (a, b) => b.score - a.score || b.amount - a.amount,
       );
-      const collectAmounts = (text: string) =>
-        [...text.matchAll(/(?:rp\.?\s*)?([0-9][0-9.,]{2,})/gi)]
-          .map((match) => Number(match[1].replace(/[.,]/g, "")))
-          .filter(
-            (value) =>
-              Number.isFinite(value) && value >= 100 && value <= 100_000_000,
-          );
-      const preferredAmounts = collectAmounts(totalLines.join(" "));
-      const amountCandidates = preferredAmounts.length
-        ? preferredAmounts
-        : collectAmounts(rawText);
-      const detectedAmount = amountCandidates.length
-        ? Math.max(...amountCandidates)
-        : null;
+      const preferredAmount = rankedAmounts.find((item) => item.score >= 10);
+      const fallbackAmount = rankedAmounts
+        .filter((item) => item.score > -3)
+        .sort((a, b) => b.amount - a.amount)[0];
+      const detectedAmount =
+        preferredAmount?.amount ?? fallbackAmount?.amount ?? null;
 
       const dateMatch = rawText.match(
-        /\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\b/,
+        /\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b/,
       );
       let detectedDate = toLocalDateOnly(new Date());
       if (dateMatch) {
-        const day = dateMatch[1].padStart(2, "0");
-        const month = dateMatch[2].padStart(2, "0");
+        const first = Number(dateMatch[1]);
+        const second = Number(dateMatch[2]);
+        const day = first > 12 ? first : second > 12 ? second : first;
+        const month = first > 12 ? second : second > 12 ? first : second;
         let year = dateMatch[3];
         if (year.length === 2) year = `20${year}`;
-        detectedDate = `${year}-${month}-${day}`;
+        const parsed = new Date(Number(year), month - 1, day);
+        if (
+          parsed.getFullYear() === Number(year) &&
+          parsed.getMonth() === month - 1 &&
+          parsed.getDate() === day
+        ) {
+          detectedDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        }
       }
 
-      const ignored =
-        /^(total|subtotal|tax|ppn|cash|change|kembalian|tunai|debit|credit|tanggal|date|time|jam|invoice|receipt|struk|no\.?|telp|phone)/i;
-      const detectedTitle = lines.find(
-        (line) =>
-          line.length > 2 && !ignored.test(line) && !/[0-9]{5,}/.test(line),
-      );
+      const ignoredLine =
+        /^(total|subtotal|tax|ppn|cash|change|kembalian|tunai|debit|credit|tanggal|date|time|jam|invoice|receipt|struk|no\.?|telp|phone|customer|cashier|kasir|qty|price|harga|thank|terima kasih)/i;
+      const merchantCandidates = lines
+        .slice(0, 10)
+        .filter(
+          (line) =>
+            line.length >= 3 &&
+            line.length <= 60 &&
+            /[a-zA-Z\u00C0-\u024F]{3,}/.test(line) &&
+            !ignoredLine.test(line) &&
+            !/\d{5,}/.test(line) &&
+            !/^(www\.|https?:|\+?\d|[=*#_-]+$)/i.test(line),
+        );
+      const detectedTitle = merchantCandidates[0];
 
       setTransactionType("expense");
       setTransactionCategory(
@@ -1993,15 +2270,24 @@ function App() {
       setTransactionDate(detectedDate);
       setEditingTransactionId(null);
       setShowTransactionModal(true);
+      setOcrProgress(100);
 
-      if (detectedAmount) {
-        notify("Struk terbaca. Periksa kembali data sebelum menyimpan.");
+      if (detectedAmount && detectedTitle) {
+        notify(
+          "Nama toko dan nominal berhasil dibaca. Periksa sebelum menyimpan.",
+        );
+      } else if (detectedAmount) {
+        notify("Nominal terbaca. Periksa nama toko dan data lainnya.");
       } else {
-        notify("Teks terbaca, tetapi nominal belum terdeteksi. Isi manual ya.");
+        notify(
+          "Teks terbaca, tetapi total belum pasti. Isi nominal secara manual.",
+        );
       }
     } catch (error) {
       console.error("Receipt OCR error:", error);
-      notify("Gagal membaca gambar. Coba foto yang lebih jelas.");
+      notify(
+        "Gagal membaca gambar. Coba foto yang lebih terang dan tidak buram.",
+      );
     } finally {
       if (worker) await worker.terminate();
       setIsReadingReceipt(false);
@@ -2255,6 +2541,18 @@ function App() {
                       ))}
                     </div>
                   </div>
+
+                  {accounts.length >= 2 && (
+                    <button
+                      type="button"
+                      className="text-action transfer-text-action"
+                      onClick={openTransferModal}
+                    >
+                      <ArrowDownUp size={14} />
+                      Transfer
+                      <ChevronRight size={14} />
+                    </button>
+                  )}
                 </>
               ) : (
                 <button className="empty-account" onClick={openAddAccount}>
@@ -3365,7 +3663,11 @@ function App() {
             {selectedTransactions.length > 0 ? (
               <div className="transaction-list activity-full-list">
                 {selectedTransactions.map((transaction) => (
-                  <div className="transaction-item" key={transaction.id}>
+                  <div
+                    className="transaction-item transaction-clickable"
+                    key={transaction.id}
+                    onClick={() => openTransactionDetail(transaction)}
+                  >
                     <div className={`transaction-icon ${transaction.type}`}>
                       {transaction.type === "income" ? (
                         <ArrowDownLeft size={19} />
@@ -3388,7 +3690,10 @@ function App() {
                       {rupiah(transaction.amount)}
                     </strong>
 
-                    <div className="transaction-actions">
+                    <div
+                      className="transaction-actions"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <button
                         type="button"
                         onClick={() => openEditTransaction(transaction)}
@@ -3642,7 +3947,6 @@ function App() {
           </button>
         </nav>
       </div>
-
       {showAccountModal && (
         <div className="modal-backdrop" onClick={closeAccountModal}>
           <div
@@ -3751,7 +4055,6 @@ function App() {
           </div>
         </div>
       )}
-
       {/* MODAL TAMBAH / EDIT KATEGORI */}
       {showCategoryModal && (
         <div className="modal-backdrop" onClick={closeCategoryModal}>
@@ -3812,7 +4115,6 @@ function App() {
           </div>
         </div>
       )}
-
       {/* MODAL KONFIRMASI HAPUS KATEGORI */}
       {categoryToDelete && (
         <div
@@ -3866,6 +4168,230 @@ function App() {
                 {isDeletingCategory ? "Deleting..." : "Delete"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {selectedTransaction && (
+        <div className="modal-backdrop" onClick={closeTransactionDetail}>
+          <div
+            className="account-modal transaction-detail-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">TRANSACTION DETAILS</p>
+                <h2>Transaction detail</h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closeTransactionDetail}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className={`detail-amount ${selectedTransaction.type}`}>
+              <span>
+                {selectedTransaction.type === "income"
+                  ? "Money received"
+                  : "Money spent"}
+              </span>
+
+              <strong>
+                {selectedTransaction.type === "income" ? "+" : "-"}
+                {rupiah(selectedTransaction.amount)}
+              </strong>
+            </div>
+
+            <div className="detail-information">
+              <div>
+                <span>Description</span>
+                <strong>{selectedTransaction.title}</strong>
+              </div>
+
+              <div>
+                <span>Account</span>
+                <strong>
+                  {accounts.find(
+                    (account) => account.id === selectedTransaction.accountId,
+                  )?.nickname ?? "Unknown account"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Category</span>
+                <strong>{selectedTransaction.category}</strong>
+              </div>
+
+              <div>
+                <span>Transaction date</span>
+                <strong>{formatDate(selectedTransaction.date)}</strong>
+              </div>
+
+              <div>
+                <span>Transaction type</span>
+                <strong>
+                  {selectedTransaction.type === "income" ? "Income" : "Expense"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Transaction ID</span>
+                <strong className="detail-transaction-id">
+                  {selectedTransaction.id}
+                </strong>
+              </div>
+            </div>
+
+            <div className="detail-actions">
+              <button
+                type="button"
+                className="primary-button full-button"
+                onClick={() => openEditTransaction(selectedTransaction)}
+              >
+                <Pencil size={16} />
+                Edit transaction
+              </button>
+
+              <button
+                type="button"
+                className="detail-delete-button"
+                onClick={() => {
+                  setTransactionToDelete(selectedTransaction);
+                  closeTransactionDetail();
+                }}
+              >
+                <Trash2 size={16} />
+                Delete transaction
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTransferModal && (
+        <div className="modal-backdrop" onClick={closeTransferModal}>
+          <div
+            className="account-modal transfer-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">MONEY MOVEMENT</p>
+                <h2>Transfer between accounts</h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closeTransferModal}
+                disabled={isSavingTransfer}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={saveTransfer}>
+              <label htmlFor="transfer-from">From account</label>
+              <select
+                id="transfer-from"
+                value={transferFromId}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setTransferFromId(value);
+
+                  if (value === transferToId) {
+                    setTransferToId(
+                      accounts.find((account) => account.id !== value)?.id ??
+                        "",
+                    );
+                  }
+                }}
+                required
+              >
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.nickname} · {account.bank}
+                  </option>
+                ))}
+              </select>
+
+              <div className="transfer-balance-info">
+                Available balance:{" "}
+                <strong>{rupiah(getAccountBalance(transferFromId))}</strong>
+              </div>
+
+              <div className="transfer-direction">
+                <ArrowDownUp size={20} />
+              </div>
+
+              <label htmlFor="transfer-to">To account</label>
+              <select
+                id="transfer-to"
+                value={transferToId}
+                onChange={(event) => setTransferToId(event.target.value)}
+                required
+              >
+                {accounts
+                  .filter((account) => account.id !== transferFromId)
+                  .map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.nickname} · {account.bank}
+                    </option>
+                  ))}
+              </select>
+
+              <label htmlFor="transfer-amount">Transfer amount</label>
+              <div className="currency-input">
+                <span>Rp</span>
+                <input
+                  id="transfer-amount"
+                  value={transferAmount}
+                  onChange={(event) =>
+                    setTransferAmount(event.target.value.replace(/\D/g, ""))
+                  }
+                  placeholder="0"
+                  inputMode="numeric"
+                  required
+                />
+              </div>
+
+              <label htmlFor="transfer-description">
+                Description (optional)
+              </label>
+              <input
+                id="transfer-description"
+                value={transferDescription}
+                onChange={(event) => setTransferDescription(event.target.value)}
+                placeholder="Contoh: Pindah uang tabungan"
+              />
+
+              <label htmlFor="transfer-date">Transfer date</label>
+              <input
+                id="transfer-date"
+                type="date"
+                value={transferDate}
+                onChange={(event) => setTransferDate(event.target.value)}
+                required
+              />
+
+              <div className="transfer-note">
+                <ArrowDownUp size={15} />
+                <span>
+                  Transfer tidak dihitung sebagai pemasukan atau pengeluaran.
+                </span>
+              </div>
+
+              <button
+                className="primary-button full-button"
+                type="submit"
+                disabled={isSavingTransfer}
+              >
+                {isSavingTransfer ? "Processing..." : "Confirm transfer"}
+              </button>
+            </form>
           </div>
         </div>
       )}
@@ -4006,7 +4532,6 @@ function App() {
           </div>
         </div>
       )}
-
       {transactionToDelete && (
         <div
           className="modal-backdrop"
@@ -4076,7 +4601,6 @@ function App() {
           </div>
         </div>
       )}
-
       {accountToDelete && (
         <div
           className="modal-backdrop"
@@ -4145,7 +4669,6 @@ function App() {
           </div>
         </div>
       )}
-
       {contributionToDelete && (
         <div
           className="modal-backdrop"
@@ -4214,7 +4737,6 @@ function App() {
           </div>
         </div>
       )}
-
       {editingContribution && (
         <div className="modal-backdrop" onClick={closeEditContribution}>
           <div
@@ -4284,7 +4806,6 @@ function App() {
           </div>
         </div>
       )}
-
       {budgetToDelete && (
         <div
           className="modal-backdrop"
@@ -4355,7 +4876,6 @@ function App() {
           </div>
         </div>
       )}
-
       {showBudgetModal && (
         <div className="modal-backdrop" onClick={closeBudgetModal}>
           <div
@@ -4442,7 +4962,6 @@ function App() {
           </div>
         </div>
       )}
-
       {showGoalModal && (
         <div className="modal-backdrop" onClick={closeGoalModal}>
           <div
@@ -4506,7 +5025,6 @@ function App() {
           </div>
         </div>
       )}
-
       {goalToDelete && (
         <div
           className="modal-backdrop"
@@ -4565,7 +5083,6 @@ function App() {
           </div>
         </div>
       )}
-
       {showContributionModal && (
         <div className="modal-backdrop" onClick={closeContributionModal}>
           <div className="account-modal" onClick={(e) => e.stopPropagation()}>
@@ -4625,7 +5142,6 @@ function App() {
           </div>
         </div>
       )}
-
       {showScanCamera && (
         <section
           className="scan-camera-overlay"
@@ -4720,7 +5236,6 @@ function App() {
           />
         </section>
       )}
-
       {isReadingReceipt && (
         <div className="scan-processing-overlay">
           <div className="scan-processing-card">
@@ -4736,7 +5251,6 @@ function App() {
           </div>
         </div>
       )}
-
       {toast && <div className="toast-message">{toast}</div>}
     </main>
   );
