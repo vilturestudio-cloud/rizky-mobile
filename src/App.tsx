@@ -53,6 +53,32 @@ type Category = {
   icon: string | null;
 };
 
+type SavingsGoal = {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate: string | null;
+  createdAt: string;
+};
+
+type GoalContribution = {
+  id: string;
+  goalId: string;
+  amount: number;
+  note: string;
+  contributedAt: string;
+};
+
+type Budget = {
+  id: string;
+  accountId: string;
+  categoryId: string;
+  budgetMonth: string;
+  amount: number;
+  createdAt: string;
+};
+
 type BankOption = {
   name: string;
   label: string;
@@ -146,6 +172,53 @@ function App() {
   });
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+
+  const [budgetMonth, setBudgetMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState<Budget | null>(null);
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
+  const [isDeletingBudget, setIsDeletingBudget] = useState(false);
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+
+  const [budgetAccountId, setBudgetAccountId] = useState("");
+  const [budgetCategoryId, setBudgetCategoryId] = useState("");
+  const [budgetAmount, setBudgetAmount] = useState("");
+
+  const [selectedSavingsGoalId, setSelectedSavingsGoalId] = useState<
+    string | null
+  >(null);
+  const [goalContributions, setGoalContributions] = useState<
+    GoalContribution[]
+  >([]);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [goalToDelete, setGoalToDelete] = useState<SavingsGoal | null>(null);
+
+  const [isDeletingGoal, setIsDeletingGoal] = useState(false);
+  const [goalName, setGoalName] = useState("");
+  const [goalTargetAmount, setGoalTargetAmount] = useState("");
+  const [goalTargetDate, setGoalTargetDate] = useState("");
+  const [showContributionModal, setShowContributionModal] = useState(false);
+  const [editingContribution, setEditingContribution] =
+    useState<GoalContribution | null>(null);
+  const [editContributionAmount, setEditContributionAmount] = useState("");
+  const [editContributionNote, setEditContributionNote] = useState("");
+
+  const [contributionToDelete, setContributionToDelete] =
+    useState<GoalContribution | null>(null);
+
+  const [isUpdatingContribution, setIsUpdatingContribution] = useState(false);
+  const [isDeletingContribution, setIsDeletingContribution] = useState(false);
+  const [selectedGoalId, setSelectedGoalId] = useState("");
+  const [contributionAmount, setContributionAmount] = useState("");
+  const [contributionNote, setContributionNote] = useState("");
+  const [isSavingContribution, setIsSavingContribution] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
@@ -214,21 +287,50 @@ function App() {
         if (cancelled) return;
         setUserId(uid);
 
-        const [accountResult, transactionResult, categoryResult] =
-          await Promise.all([
-            supabase.from("accounts").select("*").eq("user_id", uid),
-            supabase.from("transactions").select("*").eq("user_id", uid),
-            supabase.from("categories").select("*").eq("user_id", uid),
-          ]);
+        const [
+          accountsResult,
+          transactionsResult,
+          categoriesResult,
+          savingsGoalsResult,
+          contributionsResult,
+          budgetsResult,
+        ] = await Promise.all([
+          supabase.from("accounts").select("*").eq("user_id", uid),
+          supabase.from("transactions").select("*").eq("user_id", uid),
+          supabase.from("categories").select("*").eq("user_id", uid),
+          supabase.from("savings_goals").select("*").eq("user_id", uid),
+          supabase.from("goal_contributions").select("*").eq("user_id", uid),
+          supabase
+            .from("budgets")
+            .select("*")
+            .eq("user_id", uid)
+            .order("budget_month", { ascending: false }),
+        ]);
 
-        if (accountResult.error) throw accountResult.error;
-        if (transactionResult.error) throw transactionResult.error;
-        if (categoryResult.error) throw categoryResult.error;
+        if (accountsResult.error) throw accountsResult.error;
+        if (transactionsResult.error) throw transactionsResult.error;
+        if (categoriesResult.error) throw categoriesResult.error;
+        if (savingsGoalsResult.error) throw savingsGoalsResult.error;
+        if (contributionsResult.error) throw contributionsResult.error;
+        if (budgetsResult.error) throw budgetsResult.error;
 
-        let cloudAccounts = accountResult.data ?? [];
-        let cloudTransactions = transactionResult.data ?? [];
+        let cloudAccounts = accountsResult.data ?? [];
+        let cloudTransactions = transactionsResult.data ?? [];
+        let cloudCategories = categoriesResult.data ?? [];
 
-        let cloudCategories = categoryResult.data ?? [];
+        const cloudGoals = savingsGoalsResult.data ?? [];
+        const cloudContributions = contributionsResult.data ?? [];
+
+        setBudgets(
+          (budgetsResult.data ?? []).map((item) => ({
+            id: item.id,
+            accountId: item.account_id,
+            categoryId: item.category_id,
+            budgetMonth: item.budget_month,
+            amount: Number(item.amount),
+            createdAt: item.created_at,
+          })),
+        );
 
         const defaultCategories: Omit<Category, "id">[] = [
           { name: "Food & Drink", type: "expense", icon: null },
@@ -371,6 +473,27 @@ function App() {
           })),
         );
 
+        setSavingsGoals(
+          cloudGoals.map((goal: any) => ({
+            id: goal.id,
+            name: goal.name,
+            targetAmount: Number(goal.target_amount),
+            currentAmount: Number(goal.current_amount),
+            targetDate: goal.target_date ?? null,
+            createdAt: goal.created_at,
+          })),
+        );
+
+        setGoalContributions(
+          cloudContributions.map((item: any) => ({
+            id: item.id,
+            goalId: item.goal_id,
+            amount: Number(item.amount),
+            note: item.note ?? "",
+            contributedAt: item.contributed_at,
+          })),
+        );
+
         setCloudError("");
         setIsCloudReady(true);
       } catch (error) {
@@ -410,6 +533,113 @@ function App() {
   const selectedAccount =
     accounts.find((item) => item.id === selectedId) ?? null;
 
+  const budgetMonthKey = budgetMonth.slice(0, 7);
+
+  const monthlyBudgets = budgets.filter(
+    (budget) => budget.budgetMonth.slice(0, 7) === budgetMonthKey,
+  );
+
+  const budgetOverview = monthlyBudgets.map((budget) => {
+    const category = categories.find((item) => item.id === budget.categoryId);
+
+    const account = accounts.find((item) => item.id === budget.accountId);
+
+    const spent = transactions
+      .filter(
+        (transaction) =>
+          transaction.type === "expense" &&
+          transaction.accountId === budget.accountId &&
+          transaction.categoryId === budget.categoryId &&
+          transaction.date.slice(0, 7) === budgetMonthKey,
+      )
+      .reduce((total, transaction) => total + transaction.amount, 0);
+
+    return {
+      ...budget,
+      categoryName: category?.name ?? "Kategori tidak ditemukan",
+      accountName: account
+        ? `${account.bank} · ${account.nickname}`
+        : "Rekening tidak ditemukan",
+      spent,
+      remaining: budget.amount - spent,
+      percentage: (spent / budget.amount) * 100,
+      status:
+        spent >= budget.amount
+          ? "over"
+          : spent >= budget.amount * 0.8
+            ? "near"
+            : "safe",
+    };
+  });
+
+  const selectedBudget = budgetOverview.find(
+    (budget) => budget.id === selectedBudgetId,
+  );
+
+  const totalMonthlyBudget = monthlyBudgets.reduce(
+    (total, budget) => total + budget.amount,
+    0,
+  );
+
+  const totalBudgetSpent = budgetOverview.reduce(
+    (total, budget) => total + budget.spent,
+    0,
+  );
+
+  const budgetCategoryAnalytics = Array.from(
+    budgetOverview
+      .reduce(
+        (map, budget) => {
+          const existing = map.get(budget.categoryId);
+
+          if (existing) {
+            existing.spent += budget.spent;
+            existing.amount += budget.amount;
+          } else {
+            map.set(budget.categoryId, {
+              categoryId: budget.categoryId,
+              categoryName: budget.categoryName,
+              spent: budget.spent,
+              amount: budget.amount,
+            });
+          }
+
+          return map;
+        },
+        new Map<
+          string,
+          {
+            categoryId: string;
+            categoryName: string;
+            spent: number;
+            amount: number;
+          }
+        >(),
+      )
+      .values(),
+  ).sort((a, b) => b.spent - a.spent);
+
+  const topSpendingCategory = budgetCategoryAnalytics[0] ?? null;
+
+  const totalBudgetPercentage =
+    totalMonthlyBudget > 0 ? (totalBudgetSpent / totalMonthlyBudget) * 100 : 0;
+
+  const overallBudgetStatus =
+    totalMonthlyBudget === 0
+      ? "safe"
+      : totalBudgetPercentage >= 100
+        ? "over"
+        : totalBudgetPercentage >= 80
+          ? "near"
+          : "safe";
+
+  const overallBudgetStatusLabel =
+    overallBudgetStatus === "over"
+      ? "Exceeded"
+      : overallBudgetStatus === "near"
+        ? "Near Limit"
+        : "Safe";
+
   const accountBalances = useMemo(() => {
     return accounts.reduce<Record<string, number>>((result, account) => {
       const transactionNet = transactions
@@ -443,6 +673,509 @@ function App() {
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2500);
+  };
+
+  const openAddGoal = () => {
+    setEditingGoalId(null);
+    setGoalName("");
+    setGoalTargetAmount("");
+    setGoalTargetDate("");
+    setShowGoalModal(true);
+  };
+
+  const openEditGoal = (goal: SavingsGoal) => {
+    setEditingGoalId(goal.id);
+    setGoalName(goal.name);
+    setGoalTargetAmount(String(goal.targetAmount));
+    setGoalTargetDate(goal.targetDate ?? "");
+    setShowGoalModal(true);
+  };
+
+  const deleteSavingsGoal = async () => {
+    if (!goalToDelete || !userId || !isCloudReady) {
+      notify("Koneksi cloud belum siap");
+      return;
+    }
+
+    setIsDeletingGoal(true);
+
+    try {
+      const { error } = await supabase
+        .from("savings_goals")
+        .delete()
+        .eq("id", goalToDelete.id)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      const deletedGoalId = goalToDelete.id;
+
+      setSavingsGoals((current) =>
+        current.filter((goal) => goal.id !== deletedGoalId),
+      );
+
+      setGoalContributions((current) =>
+        current.filter((item) => item.goalId !== deletedGoalId),
+      );
+
+      setGoalToDelete(null);
+      setSelectedSavingsGoalId(null);
+      setActiveTab("Savings");
+
+      notify("Savings goal berhasil dihapus");
+    } catch (error) {
+      console.error("Delete savings goal error:", error);
+      notify("Gagal menghapus savings goal");
+    } finally {
+      setIsDeletingGoal(false);
+    }
+  };
+
+  const closeGoalModal = () => {
+    setShowGoalModal(false);
+    setEditingGoalId(null);
+    setGoalName("");
+    setGoalTargetAmount("");
+    setGoalTargetDate("");
+  };
+
+  const openSavingsGoalDetail = (goalId: string) => {
+    setSelectedSavingsGoalId(goalId);
+    setActiveTab("SavingsDetail");
+  };
+
+  const openContributionModal = (goalId: string) => {
+    setSelectedGoalId(goalId);
+    setContributionAmount("");
+    setContributionNote("");
+    setShowContributionModal(true);
+  };
+
+  const closeContributionModal = () => {
+    if (isSavingContribution) return;
+
+    setShowContributionModal(false);
+    setSelectedGoalId("");
+    setContributionAmount("");
+    setContributionNote("");
+  };
+
+  const openEditContribution = (contribution: GoalContribution) => {
+    setEditingContribution(contribution);
+    setEditContributionAmount(String(contribution.amount));
+    setEditContributionNote(contribution.note || "");
+  };
+
+  const closeEditContribution = () => {
+    if (isUpdatingContribution) return;
+
+    setEditingContribution(null);
+    setEditContributionAmount("");
+    setEditContributionNote("");
+  };
+
+  const saveEditedContribution = async () => {
+    if (!editingContribution || isUpdatingContribution) return;
+
+    const amount = Number(editContributionAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Nominal setoran harus lebih dari 0.");
+      return;
+    }
+
+    setIsUpdatingContribution(true);
+
+    try {
+      const { error } = await supabase.rpc("edit_goal_contribution", {
+        p_contribution_id: editingContribution.id,
+        p_amount: amount,
+        p_note: editContributionNote.trim(),
+      });
+
+      if (error) throw error;
+
+      const difference = amount - editingContribution.amount;
+
+      setGoalContributions((previous) =>
+        previous.map((item) =>
+          item.id === editingContribution.id
+            ? {
+                ...item,
+                amount,
+                note: editContributionNote.trim(),
+              }
+            : item,
+        ),
+      );
+
+      setSavingsGoals((previous) =>
+        previous.map((goal) =>
+          goal.id === editingContribution.goalId
+            ? {
+                ...goal,
+                currentAmount: goal.currentAmount + difference,
+              }
+            : goal,
+        ),
+      );
+
+      setEditingContribution(null);
+      setEditContributionAmount("");
+      setEditContributionNote("");
+    } catch (error) {
+      console.error("Gagal mengedit contribution:", error);
+      alert("Gagal mengedit setoran. Silakan coba lagi.");
+    } finally {
+      setIsUpdatingContribution(false);
+    }
+  };
+
+  const deleteContribution = async () => {
+    if (!contributionToDelete || isDeletingContribution) return;
+
+    setIsDeletingContribution(true);
+
+    try {
+      const { error } = await supabase.rpc("delete_goal_contribution", {
+        p_contribution_id: contributionToDelete.id,
+      });
+
+      if (error) throw error;
+
+      setGoalContributions((previous) =>
+        previous.filter((item) => item.id !== contributionToDelete.id),
+      );
+
+      setSavingsGoals((previous) =>
+        previous.map((goal) =>
+          goal.id === contributionToDelete.goalId
+            ? {
+                ...goal,
+                currentAmount: goal.currentAmount - contributionToDelete.amount,
+              }
+            : goal,
+        ),
+      );
+
+      setContributionToDelete(null);
+    } catch (error) {
+      console.error("Gagal menghapus contribution:", error);
+      alert("Gagal menghapus setoran. Silakan coba lagi.");
+    } finally {
+      setIsDeletingContribution(false);
+    }
+  };
+
+  const saveContribution = async () => {
+    if (!isCloudReady || !userId) {
+      notify("Cloud belum siap");
+      return;
+    }
+
+    const amount = Number(contributionAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      notify("Masukkan nominal setoran yang valid");
+      return;
+    }
+
+    if (!selectedGoalId) {
+      notify("Savings goal tidak ditemukan");
+      return;
+    }
+
+    setIsSavingContribution(true);
+
+    try {
+      const { error } = await supabase.rpc("add_goal_contribution", {
+        p_goal_id: selectedGoalId,
+        p_amount: amount,
+        p_note: contributionNote.trim(),
+      });
+
+      if (error) throw error;
+
+      const { data: updatedGoal, error: goalError } = await supabase
+        .from("savings_goals")
+        .select("*")
+        .eq("id", selectedGoalId)
+        .single();
+
+      if (goalError) throw goalError;
+
+      const { data: updatedContributions, error: contributionError } =
+        await supabase
+          .from("goal_contributions")
+          .select("*")
+          .eq("user_id", userId)
+          .order("contributed_at", { ascending: false });
+
+      if (contributionError) throw contributionError;
+
+      setSavingsGoals((prev) =>
+        prev.map((goal) =>
+          goal.id === selectedGoalId
+            ? {
+                ...goal,
+                currentAmount: Number(updatedGoal.current_amount),
+              }
+            : goal,
+        ),
+      );
+
+      setGoalContributions(
+        (updatedContributions || []).map((item) => ({
+          id: item.id,
+          goalId: item.goal_id,
+          amount: Number(item.amount),
+          note: item.note || "",
+          contributedAt: item.contributed_at,
+        })),
+      );
+
+      setShowContributionModal(false);
+      setSelectedGoalId("");
+      setContributionAmount("");
+      setContributionNote("");
+
+      notify("Setoran berhasil ditambahkan");
+    } catch (error) {
+      console.error("Save contribution error:", error);
+      notify("Gagal menyimpan setoran");
+    } finally {
+      setIsSavingContribution(false);
+    }
+  };
+
+  const openBudgetDetail = (budgetId: string) => {
+    setSelectedBudgetId(budgetId);
+    setActiveTab("BudgetDetail");
+  };
+
+  const closeBudgetModal = () => {
+    setShowBudgetModal(false);
+    setEditingBudgetId(null);
+    setBudgetAccountId("");
+    setBudgetCategoryId("");
+    setBudgetAmount("");
+  };
+
+  const saveBudget = async () => {
+    if (!userId) {
+      notify("Sesi pengguna belum siap");
+      return;
+    }
+
+    if (!budgetAccountId || !budgetCategoryId || !budgetAmount) {
+      notify("Lengkapi semua data budget");
+      return;
+    }
+
+    const amount = Number(budgetAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      notify("Nominal budget harus lebih dari 0");
+      return;
+    }
+
+    const budgetData = {
+      user_id: userId,
+      account_id: budgetAccountId,
+      category_id: budgetCategoryId,
+      budget_month: budgetMonth,
+      amount,
+    };
+
+    try {
+      let result;
+
+      if (editingBudgetId) {
+        result = await supabase
+          .from("budgets")
+          .update(budgetData)
+          .eq("id", editingBudgetId)
+          .eq("user_id", userId)
+          .select()
+          .single();
+      } else {
+        result = await supabase
+          .from("budgets")
+          .insert(budgetData)
+          .select()
+          .single();
+      }
+
+      if (result.error) throw result.error;
+
+      const savedBudget: Budget = {
+        id: result.data.id,
+        accountId: result.data.account_id,
+        categoryId: result.data.category_id,
+        budgetMonth: result.data.budget_month,
+        amount: Number(result.data.amount),
+        createdAt: result.data.created_at,
+      };
+
+      setBudgets((previous) =>
+        editingBudgetId
+          ? previous.map((item) =>
+              item.id === editingBudgetId ? savedBudget : item,
+            )
+          : [...previous, savedBudget],
+      );
+
+      closeBudgetModal();
+      notify(
+        editingBudgetId
+          ? "Budget berhasil diperbarui"
+          : "Budget berhasil ditambahkan",
+      );
+    } catch (error: any) {
+      console.error("Save budget error:", error);
+
+      if (error.code === "23505") {
+        notify("Budget untuk rekening, kategori, dan bulan ini sudah ada.");
+      } else {
+        notify("Gagal menyimpan budget. Periksa data atau koneksi.");
+      }
+    }
+  };
+
+  const deleteBudget = async () => {
+    if (!budgetToDelete || isDeletingBudget) return;
+
+    if (!userId) {
+      notify("Sesi pengguna belum siap");
+      return;
+    }
+
+    setIsDeletingBudget(true);
+
+    try {
+      const { error } = await supabase
+        .from("budgets")
+        .delete()
+        .eq("id", budgetToDelete.id)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      setBudgets((previous) =>
+        previous.filter((item) => item.id !== budgetToDelete.id),
+      );
+
+      setBudgetToDelete(null);
+      notify("Budget berhasil dihapus");
+    } catch (error) {
+      console.error("Delete budget error:", error);
+      notify("Gagal menghapus budget");
+    } finally {
+      setIsDeletingBudget(false);
+    }
+  };
+
+  const saveGoal = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const name = goalName.trim();
+    const targetAmount = Number(goalTargetAmount);
+
+    if (!name) {
+      notify("Nama target wajib diisi");
+      return;
+    }
+
+    if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
+      notify("Nominal target tidak valid");
+      return;
+    }
+
+    if (!isCloudReady || !userId) {
+      notify("Koneksi cloud belum siap");
+      return;
+    }
+
+    if (
+      savingsGoals.some(
+        (goal) =>
+          goal.id !== editingGoalId &&
+          goal.name.toLowerCase() === name.toLowerCase(),
+      )
+    ) {
+      notify("Nama target tersebut sudah digunakan");
+      return;
+    }
+
+    const goalData = {
+      name,
+      target_amount: targetAmount,
+      target_date: goalTargetDate || null,
+    };
+
+    try {
+      if (editingGoalId) {
+        const { data, error } = await supabase
+          .from("savings_goals")
+          .update(goalData)
+          .eq("id", editingGoalId)
+          .eq("user_id", userId)
+          .select("*")
+          .single();
+
+        if (error) throw error;
+
+        setSavingsGoals((current) =>
+          current.map((goal) =>
+            goal.id === editingGoalId
+              ? {
+                  ...goal,
+                  name: data.name,
+                  targetAmount: Number(data.target_amount),
+                  targetDate: data.target_date ?? null,
+                }
+              : goal,
+          ),
+        );
+
+        closeGoalModal();
+        notify("Savings goal berhasil diperbarui");
+      } else {
+        const { data, error } = await supabase
+          .from("savings_goals")
+          .insert({
+            ...goalData,
+            user_id: userId,
+            current_amount: 0,
+          })
+          .select("*")
+          .single();
+
+        if (error) throw error;
+
+        setSavingsGoals((current) => [
+          ...current,
+          {
+            id: data.id,
+            name: data.name,
+            targetAmount: Number(data.target_amount),
+            currentAmount: Number(data.current_amount),
+            targetDate: data.target_date ?? null,
+            createdAt: data.created_at,
+          },
+        ]);
+
+        closeGoalModal();
+        notify("Target tabungan berhasil dibuat");
+      }
+    } catch (error) {
+      console.error("Save goal error:", error);
+      notify(
+        editingGoalId
+          ? "Savings goal gagal diperbarui"
+          : "Target tabungan gagal disimpan",
+      );
+    }
   };
 
   const openAddAccount = () => {
@@ -482,11 +1215,6 @@ function App() {
 
     if (!option || option.kind !== accountKind) {
       notify("Pilih bank atau e-wallet yang valid");
-      return;
-    }
-
-    if (openingBalance >= 10_000_000_000_000) {
-      notify("Saldo maksimal adalah Rp9.999.999.999.999");
       return;
     }
 
@@ -1380,33 +2108,21 @@ function App() {
                 <span>Income</span>
               </button>
 
-              <button
-                onClick={() =>
-                  notify("Fitur Savings akan kita buat berikutnya")
-                }
-              >
+              <button onClick={() => setActiveTab("Savings")}>
                 <span className="shortcut-icon savings-shortcut">
                   <Wallet size={21} />
                 </span>
                 <span>Savings</span>
               </button>
 
-              <button
-                onClick={() =>
-                  notify("Fitur Goal akan kita kembangkan berikutnya")
-                }
-              >
+              <button onClick={openAddGoal}>
                 <span className="shortcut-icon">
                   <Target size={21} />
                 </span>
                 <span>Goal</span>
               </button>
 
-              <button
-                onClick={() =>
-                  notify("Fitur Budget akan kita kembangkan berikutnya")
-                }
-              >
+              <button onClick={() => setActiveTab("Budget")}>
                 <span className="shortcut-icon">
                   <ChartPie size={21} />
                 </span>
@@ -1575,6 +2291,834 @@ function App() {
             </button>
           </div>
         )}
+
+        {activeTab === "Savings" && (
+          <div className="page-content secondary-page savings-page">
+            <p className="eyebrow">PERSONAL FINANCE</p>
+            <h1>Savings</h1>
+            <p className="subheading">Pantau dan kelola seluruh tabunganmu.</p>
+
+            {/* SAVINGS OVERVIEW */}
+            <div className="savings-overview">
+              <div className="savings-total-card">
+                <span>Total savings</span>
+                <strong>
+                  {rupiah(
+                    savingsGoals.reduce(
+                      (total, goal) => total + goal.currentAmount,
+                      0,
+                    ),
+                  )}
+                </strong>
+                <small>Terkumpul dari {savingsGoals.length} savings goal</small>
+              </div>
+
+              <div className="savings-stat-grid">
+                <div className="savings-stat-card">
+                  <span>Active goals</span>
+                  <strong>
+                    {
+                      savingsGoals.filter(
+                        (goal) => goal.currentAmount < goal.targetAmount,
+                      ).length
+                    }
+                  </strong>
+                </div>
+
+                <div className="savings-stat-card">
+                  <span>Completed</span>
+                  <strong>
+                    {
+                      savingsGoals.filter(
+                        (goal) => goal.currentAmount >= goal.targetAmount,
+                      ).length
+                    }
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* SAVINGS GOALS */}
+            <section className="section-block savings-goals-section">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">FINANCIAL PLANNING</p>
+                  <h2>My savings goals</h2>
+                </div>
+
+                <button className="text-action" onClick={openAddGoal}>
+                  <Plus size={15} /> Add goal
+                </button>
+              </div>
+
+              {savingsGoals.length > 0 ? (
+                <div className="savings-goal-list">
+                  {savingsGoals.map((goal) => {
+                    const progress =
+                      goal.targetAmount > 0
+                        ? Math.min(
+                            100,
+                            (goal.currentAmount / goal.targetAmount) * 100,
+                          )
+                        : 0;
+
+                    const remaining = Math.max(
+                      0,
+                      goal.targetAmount - goal.currentAmount,
+                    );
+
+                    return (
+                      <div
+                        className="savings-goal-item"
+                        key={goal.id}
+                        onClick={() => openSavingsGoalDetail(goal.id)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            openSavingsGoalDetail(goal.id);
+                          }
+                        }}
+                      >
+                        <div className="goal-item-heading">
+                          <div>
+                            <strong>{goal.name}</strong>
+                            <span>
+                              {goal.targetDate
+                                ? `Target ${goal.targetDate}`
+                                : "No deadline"}
+                            </span>
+                          </div>
+
+                          <strong>{progress.toFixed(0)}%</strong>
+                        </div>
+
+                        <div className="goal-progress-track">
+                          <div
+                            className="goal-progress-fill"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+
+                        <div className="goal-item-footer">
+                          <span>
+                            {rupiah(goal.currentAmount)} /{" "}
+                            {rupiah(goal.targetAmount)}
+                          </span>
+
+                          <span>
+                            {remaining > 0
+                              ? `Sisa ${rupiah(remaining)}`
+                              : "Target tercapai"}
+                          </span>
+
+                          <button
+                            className="small-action"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openContributionModal(goal.id);
+                            }}
+                          >
+                            <Plus size={14} /> Add Funds
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="empty-activity">
+                  <div className="activity-empty-icon">
+                    <Target size={21} />
+                  </div>
+                  <strong>Belum ada savings goal</strong>
+                  <span>Buat target tabungan pertamamu.</span>
+                  <button className="small-action" onClick={openAddGoal}>
+                    <Plus size={14} /> Create goal
+                  </button>
+                </div>
+              )}
+            </section>
+
+            {/* CONTRIBUTION HISTORY */}
+            <section className="section-block">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">MONEY MOVEMENT</p>
+                  <h2>Recent contributions</h2>
+                </div>
+              </div>
+
+              {goalContributions.length > 0 ? (
+                <div className="transaction-list">
+                  {goalContributions.slice(0, 5).map((item) => {
+                    const goal = savingsGoals.find(
+                      (entry) => entry.id === item.goalId,
+                    );
+
+                    return (
+                      <div className="transaction-item" key={item.id}>
+                        <div className="transaction-icon income">
+                          <ArrowDownLeft size={19} />
+                        </div>
+
+                        <div className="transaction-copy">
+                          <strong>{goal?.name || "Savings"}</strong>
+                          <span>
+                            {item.note || "Contribution"} ·{" "}
+                            {formatDate(item.contributedAt)}
+                          </span>
+                        </div>
+
+                        <div className="contribution-actions">
+                          <strong className="transaction-amount income">
+                            +{rupiah(item.amount)}
+                          </strong>
+
+                          <div className="contribution-action-buttons">
+                            <button
+                              type="button"
+                              className="icon-button"
+                              title="Edit contribution"
+                              onClick={() => openEditContribution(item)}
+                            >
+                              <Pencil size={15} />
+                            </button>
+
+                            <button
+                              type="button"
+                              className="icon-button"
+                              title="Delete contribution"
+                              onClick={() => setContributionToDelete(item)}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="empty-activity">
+                  <div className="activity-empty-icon">
+                    <Wallet size={21} />
+                  </div>
+                  <strong>Belum ada contribution</strong>
+                  <span>Riwayat setoran tabungan akan muncul di sini.</span>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {activeTab === "SavingsDetail" &&
+          (() => {
+            const goal = savingsGoals.find(
+              (item) => item.id === selectedSavingsGoalId,
+            );
+
+            if (!goal) {
+              return (
+                <div className="page-content secondary-page">
+                  <button
+                    className="text-action"
+                    onClick={() => setActiveTab("Savings")}
+                  >
+                    ← Back to Savings
+                  </button>
+                  <h2>Goal tidak ditemukan</h2>
+                </div>
+              );
+            }
+
+            const progress =
+              goal.targetAmount > 0
+                ? Math.min(100, (goal.currentAmount / goal.targetAmount) * 100)
+                : 0;
+
+            const remaining = Math.max(
+              0,
+              goal.targetAmount - goal.currentAmount,
+            );
+
+            const contributions = goalContributions
+              .filter((item) => item.goalId === goal.id)
+              .sort(
+                (a, b) =>
+                  new Date(b.contributedAt).getTime() -
+                  new Date(a.contributedAt).getTime(),
+              );
+
+            return (
+              <div className="page-content secondary-page savings-detail-page">
+                <button
+                  className="text-action"
+                  onClick={() => setActiveTab("Savings")}
+                >
+                  ← Back to Savings
+                </button>
+
+                <p className="eyebrow">SAVINGS / GOAL DETAIL</p>
+                <h1>{goal.name}</h1>
+                <p className="subheading">Track your savings progress.</p>
+
+                <div className="savings-total-card savings-detail-card">
+                  <span>Total collected</span>
+                  <strong>{rupiah(goal.currentAmount)}</strong>
+
+                  <div className="goal-progress-track">
+                    <div
+                      className="goal-progress-fill"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+
+                  <div className="goal-detail-progress-label">
+                    <span>{progress.toFixed(1)}% completed</span>
+                    <span>{rupiah(goal.targetAmount)}</span>
+                  </div>
+                </div>
+
+                <div className="savings-stat-grid">
+                  <div className="savings-stat-card">
+                    <span>Remaining</span>
+                    <strong>{rupiah(remaining)}</strong>
+                  </div>
+
+                  <div className="savings-stat-card">
+                    <span>Contributions</span>
+                    <strong>{contributions.length}</strong>
+                  </div>
+                </div>
+
+                <div className="savings-detail-actions">
+                  <button
+                    className="primary-button full-button"
+                    onClick={() => openContributionModal(goal.id)}
+                  >
+                    <Plus size={16} /> Add Funds
+                  </button>
+
+                  <button
+                    className="text-action"
+                    onClick={() => openEditGoal(goal)}
+                  >
+                    Edit Savings Goal
+                  </button>
+
+                  <button
+                    className="delete-goal-button"
+                    onClick={() => setGoalToDelete(goal)}
+                  >
+                    Delete Savings Goal
+                  </button>
+                </div>
+
+                <section className="section-block">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">MONEY MOVEMENT</p>
+                      <h2>Contribution history</h2>
+                    </div>
+                  </div>
+
+                  {contributions.length > 0 ? (
+                    <div className="transaction-list">
+                      {contributions.map((item) => (
+                        <div className="transaction-item" key={item.id}>
+                          <div className="transaction-icon income">
+                            <ArrowDownLeft size={19} />
+                          </div>
+
+                          <div className="transaction-copy">
+                            <strong>
+                              {item.note || "Savings contribution"}
+                            </strong>
+                            <span>
+                              {new Date(item.contributedAt).toLocaleDateString(
+                                "id-ID",
+                                {
+                                  day: "numeric",
+                                  month: "long",
+                                  year: "numeric",
+                                },
+                              )}
+                            </span>
+                          </div>
+
+                          <strong className="transaction-amount income">
+                            +{rupiah(item.amount)}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="empty-activity">
+                      <strong>Belum ada setoran</strong>
+                      <span>Riwayat setoran akan muncul di sini.</span>
+                    </div>
+                  )}
+                </section>
+              </div>
+            );
+          })()}
+
+        {activeTab === "Budget" && (
+          <div className="page-content secondary-page budget-page">
+            <p className="eyebrow">FINANCIAL PLANNING</p>
+            <h1>Budget</h1>
+            <p className="subheading">Manage your monthly spending limits.</p>
+
+            {/* MONTH NAVIGATION */}
+            <div className="budget-month-navigation">
+              <button
+                type="button"
+                onClick={() => {
+                  const [year, month] = budgetMonth.split("-").map(Number);
+                  const date = new Date(year, month - 2, 1);
+                  setBudgetMonth(
+                    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`,
+                  );
+                }}
+              >
+                ←
+              </button>
+
+              <strong>
+                {new Date(`${budgetMonthKey}-02T12:00:00`).toLocaleDateString(
+                  "id-ID",
+                  { month: "long", year: "numeric" },
+                )}
+              </strong>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const [year, month] = budgetMonth.split("-").map(Number);
+                  const date = new Date(year, month, 1);
+                  setBudgetMonth(
+                    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`,
+                  );
+                }}
+              >
+                →
+              </button>
+            </div>
+
+            {/* BUDGET OVERVIEW */}
+            <div className="budget-overview-card">
+              <div className="budget-overview-heading">
+                <span>Total monthly budget</span>
+
+                <span className={`budget-status ${overallBudgetStatus}`}>
+                  {overallBudgetStatusLabel}
+                </span>
+              </div>
+
+              <strong>{rupiah(totalMonthlyBudget)}</strong>
+
+              <div className="budget-overview-stats">
+                <div>
+                  <span>Spent</span>
+                  <strong>{rupiah(totalBudgetSpent)}</strong>
+                </div>
+
+                <div>
+                  <span>Remaining</span>
+                  <strong
+                    className={
+                      totalMonthlyBudget - totalBudgetSpent < 0
+                        ? "budget-negative"
+                        : ""
+                    }
+                  >
+                    {rupiah(totalMonthlyBudget - totalBudgetSpent)}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="budget-progress-track">
+                <div
+                  className="budget-progress-fill"
+                  style={{
+                    width: `${
+                      totalMonthlyBudget > 0
+                        ? Math.min(100, totalBudgetPercentage)
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+
+              <span className="budget-overview-caption">
+                {totalMonthlyBudget > 0
+                  ? `${((totalBudgetSpent / totalMonthlyBudget) * 100).toFixed(1)}% of total budget used`
+                  : "Belum ada anggaran untuk bulan ini"}
+              </span>
+
+              {totalMonthlyBudget > 0 &&
+                totalBudgetSpent > totalMonthlyBudget && (
+                  <div className="budget-overview-alert">
+                    <strong>Budget Exceeded</strong>
+                    <span>
+                      Pengeluaran melebihi anggaran sebesar{" "}
+                      {rupiah(totalBudgetSpent - totalMonthlyBudget)}.
+                    </span>
+                  </div>
+                )}
+            </div>
+
+            {/* BUDGET LIST */}
+            <section className="section-block">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">SPENDING LIMITS</p>
+                  <h2>Category budgets</h2>
+                </div>
+
+                <button
+                  className="text-action"
+                  onClick={() => {
+                    setEditingBudgetId(null);
+                    setBudgetAccountId("");
+                    setBudgetCategoryId("");
+                    setBudgetAmount("");
+                    setShowBudgetModal(true);
+                  }}
+                >
+                  <Plus size={16} /> Add Budget
+                </button>
+              </div>
+
+              {budgetOverview.length > 0 ? (
+                <div className="budget-list">
+                  {budgetOverview.map((budget) => (
+                    <div
+                      className="budget-item budget-item-clickable"
+                      key={budget.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openBudgetDetail(budget.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openBudgetDetail(budget.id);
+                        }
+                      }}
+                    >
+                      <div className="budget-item-header">
+                        <div>
+                          <strong>{budget.categoryName}</strong>
+                          <span>{budget.accountName}</span>
+                          <span className={`budget-status ${budget.status}`}>
+                            {budget.status === "over"
+                              ? "Exceeded"
+                              : budget.status === "near"
+                                ? "Near limit"
+                                : "Safe"}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="text-action budget-delete-action"
+                          onClick={() => setBudgetToDelete(budget)}
+                        >
+                          <Trash2 size={15} /> Delete
+                        </button>
+                      </div>
+
+                      <div className="budget-item-amounts">
+                        <strong>{rupiah(budget.spent)}</strong>
+                        <span>of {rupiah(budget.amount)}</span>
+                      </div>
+
+                      <div className="budget-progress-track">
+                        <div
+                          className={`budget-progress-fill ${
+                            budget.percentage >= 100
+                              ? "over-budget"
+                              : budget.percentage >= 80
+                                ? "near-budget"
+                                : ""
+                          }`}
+                          style={{
+                            width: `${Math.min(100, budget.percentage)}%`,
+                          }}
+                        />
+                      </div>
+
+                      <div className="budget-item-footer">
+                        <span>{budget.percentage.toFixed(1)}% used</span>
+
+                        <strong
+                          className={
+                            budget.remaining < 0 ? "budget-negative" : ""
+                          }
+                        >
+                          {budget.remaining < 0
+                            ? `Over ${rupiah(Math.abs(budget.remaining))}`
+                            : `${rupiah(budget.remaining)} left`}
+                        </strong>
+                      </div>
+
+                      {budget.percentage >= 100 && (
+                        <div className="budget-alert">
+                          <span>!</span>
+                          Budget limit exceeded
+                        </div>
+                      )}
+
+                      {budget.percentage >= 80 && budget.percentage < 100 && (
+                        <div className="budget-warning">
+                          Approaching budget limit
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-activity">
+                  <div className="activity-empty-icon">
+                    <ChartPie size={21} />
+                  </div>
+
+                  <strong>No budget yet</strong>
+
+                  <span>
+                    Buat anggaran pertamamu untuk mulai mengontrsol pengeluaran
+                    bulanan.
+                  </span>
+
+                  <button
+                    className="small-action"
+                    onClick={() => {
+                      setEditingBudgetId(null);
+                      setBudgetAccountId("");
+                      setBudgetCategoryId("");
+                      setBudgetAmount("");
+                      setShowBudgetModal(true);
+                    }}
+                  >
+                    <Plus size={14} /> Create budget
+                  </button>
+                </div>
+              )}
+            </section>
+
+            {/* BUDGET ANALYTICS */}
+            <section className="section-block budget-analytics">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">SPENDING INSIGHTS</p>
+                  <h2>Top Spending Categories</h2>
+                </div>
+              </div>
+
+              {topSpendingCategory ? (
+                <>
+                  <div className="budget-top-category">
+                    <span>Highest spending</span>
+                    <strong>{topSpendingCategory.categoryName}</strong>
+                    <strong>{rupiah(topSpendingCategory.spent)}</strong>
+                  </div>
+
+                  <div className="budget-analytics-list">
+                    {budgetCategoryAnalytics
+                      .slice(0, 3)
+                      .map((category, index) => {
+                        const percentage =
+                          totalBudgetSpent > 0
+                            ? (category.spent / totalBudgetSpent) * 100
+                            : 0;
+
+                        return (
+                          <div
+                            className="budget-analytics-item"
+                            key={category.categoryId}
+                          >
+                            <div className="budget-analytics-info">
+                              <div>
+                                <span className="budget-analytics-rank">
+                                  0{index + 1}
+                                </span>
+                                <strong>{category.categoryName}</strong>
+                              </div>
+
+                              <strong>{rupiah(category.spent)}</strong>
+                            </div>
+
+                            <div className="budget-progress-track">
+                              <div
+                                className="budget-progress-fill"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+
+                            <span className="budget-analytics-percentage">
+                              {percentage.toFixed(1)}% of total spending
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </>
+              ) : (
+                <div className="empty-activity">
+                  <strong>Belum ada data analitik</strong>
+                  <span>
+                    Tambahkan budget untuk mulai melihat pola pengeluaran.
+                  </span>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {activeTab === "BudgetDetail" &&
+          (() => {
+            if (!selectedBudget) {
+              return (
+                <div className="page-content secondary-page">
+                  <button
+                    className="text-action"
+                    onClick={() => setActiveTab("Budget")}
+                  >
+                    ← Back to Budget
+                  </button>
+                  <h2>Budget tidak ditemukan</h2>
+                </div>
+              );
+            }
+
+            const progress =
+              selectedBudget.amount > 0
+                ? Math.min(
+                    100,
+                    (selectedBudget.spent / selectedBudget.amount) * 100,
+                  )
+                : 0;
+
+            const budgetTransactions = transactions
+              .filter(
+                (transaction) =>
+                  transaction.type === "expense" &&
+                  transaction.accountId === selectedBudget.accountId &&
+                  transaction.categoryId === selectedBudget.categoryId &&
+                  transaction.date.slice(0, 7) ===
+                    selectedBudget.budgetMonth.slice(0, 7),
+              )
+              .sort(
+                (a, b) =>
+                  new Date(b.date).getTime() - new Date(a.date).getTime(),
+              );
+
+            return (
+              <div className="page-content secondary-page budget-detail-page">
+                <button
+                  className="text-action"
+                  onClick={() => setActiveTab("Budget")}
+                >
+                  ← Back to Budget
+                </button>
+
+                <p className="eyebrow">BUDGET / CATEGORY DETAIL</p>
+                <h1>{selectedBudget.categoryName}</h1>
+                <p className="subheading">{selectedBudget.accountName}</p>
+
+                <div className="savings-total-card savings-detail-card budget-detail-card">
+                  <span>Total spent</span>
+                  <strong>{rupiah(selectedBudget.spent)}</strong>
+
+                  <div className="goal-progress-track">
+                    <div
+                      className="goal-progress-fill"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+
+                  <div className="goal-detail-progress-label">
+                    <span>{progress.toFixed(1)}% used</span>
+                    <span>{rupiah(selectedBudget.amount)}</span>
+                  </div>
+                </div>
+
+                <div className="savings-stat-grid">
+                  <div className="savings-stat-card">
+                    <span>Remaining</span>
+                    <strong>{rupiah(selectedBudget.remaining)}</strong>
+                  </div>
+
+                  <div className="savings-stat-card">
+                    <span>Transactions</span>
+                    <strong>{budgetTransactions.length}</strong>
+                  </div>
+                </div>
+
+                <div className="savings-detail-actions">
+                  <button
+                    className="text-action"
+                    onClick={() => {
+                      setEditingBudgetId(selectedBudget.id);
+                      setBudgetAccountId(selectedBudget.accountId);
+                      setBudgetCategoryId(selectedBudget.categoryId);
+                      setBudgetAmount(String(selectedBudget.amount));
+                      setShowBudgetModal(true);
+                    }}
+                  >
+                    Edit Budget
+                  </button>
+
+                  <button
+                    className="delete-goal-button"
+                    onClick={() => setBudgetToDelete(selectedBudget)}
+                  >
+                    Delete Budget
+                  </button>
+                </div>
+
+                <section className="section-block">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">MONEY MOVEMENT</p>
+                      <h2>Budget history</h2>
+                    </div>
+                  </div>
+
+                  {budgetTransactions.length > 0 ? (
+                    <div className="transaction-list">
+                      {budgetTransactions.map((item) => (
+                        <div className="transaction-item" key={item.id}>
+                          <div className="transaction-icon expense">
+                            <ArrowUpRight size={19} />
+                          </div>
+
+                          <div className="transaction-copy">
+                            <strong>{item.title}</strong>
+                            <span>{formatDate(item.date)}</span>
+                          </div>
+
+                          <strong className="transaction-amount expense">
+                            -{rupiah(item.amount)}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="empty-activity">
+                      <strong>Belum ada pengeluaran</strong>
+                      <span>
+                        Riwayat pengeluaran kategori ini akan muncul di sini.
+                      </span>
+                    </div>
+                  )}
+                </section>
+              </div>
+            );
+          })()}
+
         {activeTab === "Activity" && (
           <div className="page-content secondary-page">
             <p className="eyebrow">MONEY MOVEMENT</p>
@@ -2379,6 +3923,486 @@ function App() {
                 {isDeletingAccount ? "Deleting..." : "Delete"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {contributionToDelete && (
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            if (!isDeletingContribution) {
+              setContributionToDelete(null);
+            }
+          }}
+        >
+          <div
+            className="account-modal delete-confirm-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">CONFIRMATION</p>
+                <h2>Delete contribution?</h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setContributionToDelete(null)}
+                disabled={isDeletingContribution}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="delete-warning-icon">
+              <Trash2 size={25} />
+            </div>
+
+            <p className="delete-confirm-description">
+              Kamu yakin ingin menghapus setoran ini? Saldo Savings Goal akan
+              otomatis dikurangi sesuai nominal setoran.
+            </p>
+
+            <div className="delete-transaction-preview">
+              <span>Contribution</span>
+              <strong>
+                {contributionToDelete.note || "Savings contribution"}
+              </strong>
+              <b>{rupiah(contributionToDelete.amount)}</b>
+            </div>
+
+            <div className="delete-confirm-actions">
+              <button
+                type="button"
+                className="delete-cancel-button"
+                onClick={() => setContributionToDelete(null)}
+                disabled={isDeletingContribution}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="delete-confirm-button"
+                onClick={deleteContribution}
+                disabled={isDeletingContribution}
+              >
+                {isDeletingContribution ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingContribution && (
+        <div className="modal-backdrop" onClick={closeEditContribution}>
+          <div
+            className="account-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">SAVINGS MANAGEMENT</p>
+                <h2>Edit contribution</h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closeEditContribution}
+                disabled={isUpdatingContribution}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveEditedContribution();
+              }}
+            >
+              <label htmlFor="edit-contribution-amount">
+                Contribution amount
+              </label>
+
+              <div className="currency-input">
+                <span>Rp</span>
+                <input
+                  id="edit-contribution-amount"
+                  type="number"
+                  min="1"
+                  value={editContributionAmount}
+                  onChange={(event) =>
+                    setEditContributionAmount(event.target.value)
+                  }
+                  placeholder="0"
+                  required
+                />
+              </div>
+
+              <label htmlFor="edit-contribution-note">Note (optional)</label>
+
+              <input
+                id="edit-contribution-note"
+                value={editContributionNote}
+                onChange={(event) =>
+                  setEditContributionNote(event.target.value)
+                }
+                placeholder="Contoh: Tabungan bulanan"
+              />
+
+              <button
+                type="submit"
+                className="primary-button full-button"
+                disabled={isUpdatingContribution}
+              >
+                {isUpdatingContribution ? "Saving..." : "Save Changes"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {budgetToDelete && (
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            if (!isDeletingBudget) {
+              setBudgetToDelete(null);
+            }
+          }}
+        >
+          <div
+            className="account-modal delete-confirm-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">CONFIRMATION</p>
+                <h2>Delete Budget?</h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setBudgetToDelete(null)}
+                disabled={isDeletingBudget}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="delete-warning-icon">
+              <Trash2 size={25} />
+            </div>
+
+            <p className="delete-confirm-description">
+              Apakah kamu yakin ingin menghapus anggaran ini? Tindakan ini tidak
+              dapat dibatalkan.
+            </p>
+
+            <div className="delete-transaction-preview">
+              <span>Budget category</span>
+              <strong>
+                {categories.find(
+                  (item) => item.id === budgetToDelete.categoryId,
+                )?.name ?? "Unknown category"}
+              </strong>
+              <b>{rupiah(budgetToDelete.amount)}</b>
+            </div>
+
+            <div className="delete-confirm-actions">
+              <button
+                type="button"
+                className="delete-cancel-button"
+                disabled={isDeletingBudget}
+                onClick={() => setBudgetToDelete(null)}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="delete-confirm-button"
+                disabled={isDeletingBudget}
+                onClick={deleteBudget}
+              >
+                {isDeletingBudget ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBudgetModal && (
+        <div className="modal-backdrop" onClick={closeBudgetModal}>
+          <div
+            className="account-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">FINANCIAL PLANNING</p>
+                <h2>{editingBudgetId ? "Edit Budget" : "Create Budget"}</h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closeBudgetModal}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveBudget();
+              }}
+            >
+              <label htmlFor="budget-month">Budget month</label>
+              <input
+                id="budget-month"
+                type="month"
+                value={budgetMonth.slice(0, 7)}
+                onChange={(event) => setBudgetMonth(`${event.target.value}-01`)}
+                required
+              />
+
+              <label htmlFor="budget-account">Source account</label>
+              <select
+                id="budget-account"
+                value={budgetAccountId}
+                onChange={(event) => setBudgetAccountId(event.target.value)}
+                required
+              >
+                <option value="">Select account</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.bank} · {account.nickname}
+                  </option>
+                ))}
+              </select>
+
+              <label htmlFor="budget-category">Expense category</label>
+              <select
+                id="budget-category"
+                value={budgetCategoryId}
+                onChange={(event) => setBudgetCategoryId(event.target.value)}
+                required
+              >
+                <option value="">Select category</option>
+                {categories
+                  .filter((category) => category.type === "expense")
+                  .map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+              </select>
+
+              <label htmlFor="budget-amount">Budget amount (IDR)</label>
+              <input
+                id="budget-amount"
+                type="number"
+                min="1"
+                placeholder="Example: 1000000"
+                value={budgetAmount}
+                onChange={(event) => setBudgetAmount(event.target.value)}
+                required
+              />
+
+              <button className="primary-button full-button" type="submit">
+                {editingBudgetId ? "Save Changes" : "Create Budget"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showGoalModal && (
+        <div className="modal-backdrop" onClick={closeGoalModal}>
+          <div
+            className="account-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">SAVINGS MANAGEMENT</p>
+                <h2>
+                  {editingGoalId ? "Edit savings goal" : "Create savings goal"}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closeGoalModal}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={saveGoal}>
+              <label htmlFor="goal-name">Goal name</label>
+              <input
+                id="goal-name"
+                value={goalName}
+                onChange={(event) => setGoalName(event.target.value)}
+                placeholder="Contoh: Emergency Fund"
+                required
+              />
+
+              <label htmlFor="goal-target">Target amount</label>
+              <div className="currency-input">
+                <span>Rp</span>
+                <input
+                  id="goal-target"
+                  value={goalTargetAmount}
+                  onChange={(event) =>
+                    setGoalTargetAmount(event.target.value.replace(/\D/g, ""))
+                  }
+                  placeholder="0"
+                  inputMode="numeric"
+                  required
+                />
+              </div>
+
+              <label htmlFor="goal-date">Target date (optional)</label>
+              <input
+                id="goal-date"
+                type="date"
+                value={goalTargetDate}
+                onChange={(event) => setGoalTargetDate(event.target.value)}
+              />
+
+              <button className="primary-button full-button" type="submit">
+                {editingGoalId ? "Save Changes" : "Create goal"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {goalToDelete && (
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            if (!isDeletingGoal) setGoalToDelete(null);
+          }}
+        >
+          <div
+            className="account-modal delete-goal-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">SAVINGS MANAGEMENT</p>
+                <h2>Delete savings goal?</h2>
+              </div>
+
+              <button
+                className="icon-button"
+                disabled={isDeletingGoal}
+                onClick={() => setGoalToDelete(null)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="delete-goal-description">
+              Kamu yakin ingin menghapus
+              <strong> {goalToDelete.name}</strong>? Seluruh riwayat
+              contribution pada goal ini juga akan dihapus. Tindakan ini tidak
+              dapat dibatalkan.
+            </p>
+
+            <div className="delete-goal-summary">
+              <span>Total terkumpul</span>
+              <strong>{rupiah(goalToDelete.currentAmount)}</strong>
+            </div>
+
+            <div className="delete-goal-actions">
+              <button
+                className="text-action"
+                disabled={isDeletingGoal}
+                onClick={() => setGoalToDelete(null)}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="delete-goal-confirm"
+                disabled={isDeletingGoal}
+                onClick={deleteSavingsGoal}
+              >
+                {isDeletingGoal ? "Deleting..." : "Yes, Delete Goal"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showContributionModal && (
+        <div className="modal-backdrop" onClick={closeContributionModal}>
+          <div className="account-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">SAVINGS GOAL</p>
+                <h2>Add Contribution</h2>
+              </div>
+
+              <button
+                className="icon-button"
+                onClick={closeContributionModal}
+                disabled={isSavingContribution}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="form-group">
+              <label>Goal</label>
+              <div className="form-static-value">
+                {savingsGoals.find((goal) => goal.id === selectedGoalId)
+                  ?.name || "Savings Goal"}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Contribution Amount</label>
+              <input
+                className="currency-input"
+                type="number"
+                min="1"
+                placeholder="Masukkan nominal"
+                value={contributionAmount}
+                onChange={(e) => setContributionAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Note (Optional)</label>
+              <input
+                className="currency-input"
+                type="text"
+                placeholder="Contoh: Tabungan bulan November"
+                value={contributionNote}
+                onChange={(e) => setContributionNote(e.target.value)}
+              />
+            </div>
+
+            <button
+              className="primary-button full-button"
+              onClick={saveContribution}
+              disabled={isSavingContribution}
+            >
+              {isSavingContribution ? "Saving..." : "Save Contribution"}
+            </button>
           </div>
         </div>
       )}
