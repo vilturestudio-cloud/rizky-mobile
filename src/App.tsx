@@ -6,9 +6,11 @@ import {
   ArrowUpRight,
   Bell,
   Camera,
+  CalendarDays,
   ImagePlus,
   Zap,
   ChevronRight,
+  ChevronLeft,
   CreditCard,
   Home,
   Target,
@@ -16,6 +18,7 @@ import {
   Coins,
   Plus,
   Pencil,
+  Repeat,
   ScanLine,
   UserRound,
   Wallet,
@@ -51,6 +54,21 @@ type Transaction = {
   date: string;
 };
 
+type RecurringTransaction = {
+  id: string;
+  accountId: string;
+  title: string;
+  category: string;
+  amount: number;
+  type: "income" | "expense";
+  frequency: "daily" | "weekly" | "monthly" | "yearly";
+  intervalValue: number;
+  startDate: string;
+  nextDueDate: string;
+  notes: string;
+  isActive: boolean;
+};
+
 type AccountTransfer = {
   id: string;
   fromAccountId: string;
@@ -58,6 +76,21 @@ type AccountTransfer = {
   amount: number;
   description: string;
   transferDate: string;
+};
+
+type BillReminder = {
+  id: string;
+  accountId: string;
+  title: string;
+  category: string;
+  amount: number;
+  frequency: "once" | "weekly" | "monthly" | "yearly";
+  intervalValue: number;
+  nextDueDate: string;
+  reminderDaysBefore: number;
+  notes: string;
+  lastPaidAt: string | null;
+  isActive: boolean;
 };
 
 type Category = {
@@ -201,6 +234,50 @@ function App() {
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
 
+  const [recurringTransactions, setRecurringTransactions] = useState<
+    RecurringTransaction[]
+  >([]);
+
+  const [billReminders, setBillReminders] = useState<BillReminder[]>([]);
+  const [showBillModal, setShowBillModal] = useState(false);
+  const [editingBillId, setEditingBillId] = useState<string | null>(null);
+  const [isSavingBill, setIsSavingBill] = useState(false);
+  const [isConfirmingBill, setIsConfirmingBill] = useState<string | null>(null);
+  const [isDeletingBill, setIsDeletingBill] = useState<string | null>(null);
+
+  const [showRecurringModal, setShowRecurringModal] = useState(false);
+  const [editingRecurringId, setEditingRecurringId] = useState<string | null>(
+    null,
+  );
+  const [isSavingRecurring, setIsSavingRecurring] = useState(false);
+
+  const [recurringTitle, setRecurringTitle] = useState("");
+  const [recurringAccountId, setRecurringAccountId] = useState("");
+  const [recurringCategory, setRecurringCategory] = useState("");
+  const [recurringAmount, setRecurringAmount] = useState("");
+  const [recurringType, setRecurringType] = useState<"income" | "expense">(
+    "expense",
+  );
+  const [recurringFrequency, setRecurringFrequency] =
+    useState<RecurringTransaction["frequency"]>("monthly");
+  const [recurringInterval, setRecurringInterval] = useState("1");
+  const [recurringStartDate, setRecurringStartDate] = useState(() =>
+    toLocalDateOnly(new Date()),
+  );
+  const [recurringNotes, setRecurringNotes] = useState("");
+  const [billTitle, setBillTitle] = useState("");
+  const [billAccountId, setBillAccountId] = useState("");
+  const [billCategory, setBillCategory] = useState("Bills & Utilities");
+  const [billAmount, setBillAmount] = useState("");
+  const [billFrequency, setBillFrequency] =
+    useState<BillReminder["frequency"]>("monthly");
+  const [billInterval, setBillInterval] = useState("1");
+  const [billDueDate, setBillDueDate] = useState(() =>
+    toLocalDateOnly(new Date()),
+  );
+  const [billReminderDays, setBillReminderDays] = useState("3");
+  const [billNotes, setBillNotes] = useState("");
+
   const [budgetMonth, setBudgetMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
@@ -264,6 +341,14 @@ function App() {
     return saved[0]?.id ?? null;
   });
   const [activeTab, setActiveTab] = useState("Home");
+  const [activityView, setActivityView] = useState<
+    "transactions" | "transfers"
+  >("transactions");
+
+  const [transferAccountFilter, setTransferAccountFilter] = useState("all");
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState<
+    "all" | "income" | "expense"
+  >("all");
   const showBalance = true;
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
@@ -556,6 +641,80 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!isCloudReady || !userId) return;
+
+    const loadRecurringTransactions = async () => {
+      const { data, error } = await supabase
+        .from("recurring_transactions")
+        .select("*")
+        .eq("user_id", userId)
+        .order("next_due_date", { ascending: true });
+
+      if (error) {
+        console.error("Load recurring transactions error:", error);
+        notify("Gagal memuat jadwal transaksi");
+        return;
+      }
+
+      setRecurringTransactions(
+        (data ?? []).map((item) => ({
+          id: item.id,
+          accountId: item.account_id,
+          title: item.title,
+          category: item.category,
+          amount: Number(item.amount),
+          type: item.type,
+          frequency: item.frequency,
+          intervalValue: item.interval_value,
+          startDate: item.start_date,
+          nextDueDate: item.next_due_date,
+          notes: item.notes ?? "",
+          isActive: item.is_active,
+        })),
+      );
+    };
+
+    void loadRecurringTransactions();
+  }, [isCloudReady, userId]);
+
+  useEffect(() => {
+    if (!isCloudReady || !userId) return;
+
+    const loadBillReminders = async () => {
+      const { data, error } = await supabase
+        .from("bill_reminders")
+        .select("*")
+        .eq("user_id", userId)
+        .order("next_due_date", { ascending: true });
+
+      if (error) {
+        console.error("Load bill reminders error:", error);
+        notify("Gagal memuat pengingat tagihan");
+        return;
+      }
+
+      setBillReminders(
+        (data ?? []).map((item) => ({
+          id: item.id,
+          accountId: item.account_id,
+          title: item.title,
+          category: item.category,
+          amount: Number(item.amount),
+          frequency: item.frequency,
+          intervalValue: item.interval_value,
+          nextDueDate: item.next_due_date,
+          reminderDaysBefore: item.reminder_days_before,
+          notes: item.notes ?? "",
+          lastPaidAt: item.last_paid_at ?? null,
+          isActive: item.is_active,
+        })),
+      );
+    };
+
+    void loadBillReminders();
+  }, [isCloudReady, userId]);
+
+  useEffect(() => {
     if (isCloudReady) {
       localStorage.setItem(ACCOUNT_KEY, JSON.stringify(accounts));
     }
@@ -748,12 +907,539 @@ function App() {
     [transactions, selectedId],
   );
 
+  const filteredTransfers = useMemo(
+    () =>
+      transfers
+        .filter(
+          (item) =>
+            transferAccountFilter === "all" ||
+            item.fromAccountId === transferAccountFilter ||
+            item.toAccountId === transferAccountFilter,
+        )
+        .sort((a, b) => b.transferDate.localeCompare(a.transferDate)),
+    [transfers, transferAccountFilter],
+  );
+
   const selectedBank =
     accountOptions.find((item) => item.name === bank) ?? accountOptions[0];
 
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2500);
+  };
+
+  const openAddRecurring = () => {
+    setEditingRecurringId(null);
+    setRecurringTitle("");
+    setRecurringAccountId(selectedId || accounts[0]?.id || "");
+    setRecurringCategory("");
+    setRecurringAmount("");
+    setRecurringType("expense");
+    setRecurringFrequency("monthly");
+    setRecurringInterval("1");
+    setRecurringStartDate(toLocalDateOnly(new Date()));
+    setRecurringNotes("");
+    setShowRecurringModal(true);
+  };
+
+  const openEditRecurring = (item: RecurringTransaction) => {
+    setEditingRecurringId(item.id);
+    setRecurringTitle(item.title);
+    setRecurringAccountId(item.accountId);
+    setRecurringCategory(item.category);
+    setRecurringAmount(String(item.amount));
+    setRecurringType(item.type);
+    setRecurringFrequency(item.frequency);
+    setRecurringInterval(String(item.intervalValue));
+    setRecurringStartDate(item.startDate);
+    setRecurringNotes(item.notes);
+    setShowRecurringModal(true);
+  };
+
+  const closeRecurringModal = () => {
+    if (isSavingRecurring) return;
+    setShowRecurringModal(false);
+    setEditingRecurringId(null);
+  };
+
+  const openAddBill = () => {
+    setEditingBillId(null);
+    setBillTitle("");
+    setBillAccountId(selectedId || accounts[0]?.id || "");
+    setBillCategory(
+      categories.find(
+        (category) =>
+          category.type === "expense" && category.name === "Bills & Utilities",
+      )?.name ??
+        categories.find((category) => category.type === "expense")?.name ??
+        "",
+    );
+    setBillAmount("");
+    setBillFrequency("monthly");
+    setBillInterval("1");
+    setBillDueDate(toLocalDateOnly(new Date()));
+    setBillReminderDays("3");
+    setBillNotes("");
+    setShowBillModal(true);
+  };
+
+  const openEditBill = (item: BillReminder) => {
+    setEditingBillId(item.id);
+    setBillTitle(item.title);
+    setBillAccountId(item.accountId);
+    setBillCategory(item.category);
+    setBillAmount(String(item.amount));
+    setBillFrequency(item.frequency);
+    setBillInterval(String(item.intervalValue));
+    setBillDueDate(item.nextDueDate);
+    setBillReminderDays(String(item.reminderDaysBefore));
+    setBillNotes(item.notes);
+    setShowBillModal(true);
+  };
+
+  const closeBillModal = () => {
+    if (isSavingBill) return;
+    setShowBillModal(false);
+    setEditingBillId(null);
+  };
+
+  const saveBillReminder = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!userId || !isCloudReady) {
+      notify("Koneksi cloud belum siap");
+      return;
+    }
+
+    const amount = Number(billAmount);
+    const interval = Number(billInterval);
+    const reminderDays = Number(billReminderDays);
+
+    if (
+      !billTitle.trim() ||
+      !billAccountId ||
+      !billCategory ||
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      !Number.isInteger(interval) ||
+      interval <= 0 ||
+      !billDueDate ||
+      !Number.isInteger(reminderDays) ||
+      reminderDays < 0 ||
+      reminderDays > 30
+    ) {
+      notify("Periksa kembali data tagihan");
+      return;
+    }
+
+    setIsSavingBill(true);
+
+    try {
+      const payload = {
+        user_id: userId,
+        account_id: billAccountId,
+        title: billTitle.trim(),
+        category: billCategory,
+        amount,
+        frequency: billFrequency,
+        interval_value: interval,
+        next_due_date: billDueDate,
+        reminder_days_before: reminderDays,
+        notes: billNotes.trim(),
+      };
+
+      let savedData;
+      let error;
+
+      if (editingBillId) {
+        const result = await supabase
+          .from("bill_reminders")
+          .update(payload)
+          .eq("id", editingBillId)
+          .eq("user_id", userId)
+          .select()
+          .single();
+
+        savedData = result.data;
+        error = result.error;
+      } else {
+        const result = await supabase
+          .from("bill_reminders")
+          .insert(payload)
+          .select()
+          .single();
+
+        savedData = result.data;
+        error = result.error;
+      }
+
+      if (error) throw error;
+
+      const savedItem: BillReminder = {
+        id: savedData.id,
+        accountId: savedData.account_id,
+        title: savedData.title,
+        category: savedData.category,
+        amount: Number(savedData.amount),
+        frequency: savedData.frequency,
+        intervalValue: savedData.interval_value,
+        nextDueDate: savedData.next_due_date,
+        reminderDaysBefore: savedData.reminder_days_before,
+        notes: savedData.notes ?? "",
+        lastPaidAt: savedData.last_paid_at ?? null,
+        isActive: savedData.is_active,
+      };
+
+      setBillReminders((current) => {
+        const updated = editingBillId
+          ? current.map((item) =>
+              item.id === editingBillId ? savedItem : item,
+            )
+          : [...current, savedItem];
+
+        return updated.sort((a, b) =>
+          a.nextDueDate.localeCompare(b.nextDueDate),
+        );
+      });
+
+      setShowBillModal(false);
+      setEditingBillId(null);
+
+      notify(
+        editingBillId
+          ? "Pengingat tagihan berhasil diperbarui"
+          : "Pengingat tagihan berhasil ditambahkan",
+      );
+    } catch (error) {
+      console.error("Save bill reminder error:", error);
+      notify("Gagal menyimpan pengingat tagihan");
+    } finally {
+      setIsSavingBill(false);
+    }
+  };
+
+  const confirmBillPayment = async (item: BillReminder) => {
+    if (!userId || !isCloudReady) {
+      notify("Koneksi cloud belum siap");
+      return;
+    }
+
+    if (item.nextDueDate > toLocalDateOnly(new Date())) {
+      notify("Tagihan belum jatuh tempo");
+      return;
+    }
+
+    setIsConfirmingBill(item.id);
+
+    try {
+      const { data, error } = await supabase.rpc("confirm_bill_payment", {
+        p_bill_id: item.id,
+      });
+
+      if (error) throw error;
+
+      const transaction = data.transaction;
+
+      const matchedCategory = categories.find(
+        (category) =>
+          category.name === transaction.category && category.type === "expense",
+      );
+
+      const newTransaction: Transaction = {
+        id: transaction.id,
+        accountId: transaction.account_id,
+        categoryId: transaction.category_id ?? matchedCategory?.id ?? null,
+        title: transaction.description,
+        category: transaction.category,
+        amount: Number(transaction.amount),
+        type: "expense",
+        date: transaction.transaction_date,
+      };
+
+      setTransactions((current) => [newTransaction, ...current]);
+
+      setBillReminders((current) =>
+        current.map((bill) =>
+          bill.id === item.id
+            ? {
+                ...bill,
+                nextDueDate: data.next_due_date ?? bill.nextDueDate,
+                lastPaidAt: new Date().toISOString(),
+                isActive: data.is_active,
+              }
+            : bill,
+        ),
+      );
+
+      notify("Pembayaran berhasil dicatat");
+    } catch (error) {
+      console.error("Confirm bill payment error:", error);
+      notify("Gagal mencatat pembayaran");
+    } finally {
+      setIsConfirmingBill(null);
+    }
+  };
+
+  const deleteBillReminder = async (item: BillReminder) => {
+    if (!userId || !isCloudReady) {
+      notify("Koneksi cloud belum siap");
+      return;
+    }
+
+    setIsDeletingBill(item.id);
+
+    try {
+      const { error } = await supabase
+        .from("bill_reminders")
+        .delete()
+        .eq("id", item.id)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      setBillReminders((current) =>
+        current.filter((bill) => bill.id !== item.id),
+      );
+
+      notify("Pengingat tagihan berhasil dihapus");
+    } catch (error) {
+      console.error("Delete bill reminder error:", error);
+      notify("Gagal menghapus pengingat tagihan");
+    } finally {
+      setIsDeletingBill(null);
+    }
+  };
+
+  const saveRecurringTransaction = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+
+    if (!userId || !isCloudReady) {
+      notify("Koneksi cloud belum siap");
+      return;
+    }
+
+    const amount = Number(recurringAmount);
+    const interval = Number(recurringInterval);
+
+    if (
+      !recurringTitle.trim() ||
+      !recurringAccountId ||
+      !recurringCategory ||
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      !Number.isInteger(interval) ||
+      interval <= 0 ||
+      !recurringStartDate
+    ) {
+      notify("Periksa kembali data jadwal");
+      return;
+    }
+
+    setIsSavingRecurring(true);
+
+    try {
+      const existing = recurringTransactions.find(
+        (item) => item.id === editingRecurringId,
+      );
+
+      const payload = {
+        user_id: userId,
+        account_id: recurringAccountId,
+        title: recurringTitle.trim(),
+        category: recurringCategory,
+        amount,
+        type: recurringType,
+        frequency: recurringFrequency,
+        interval_value: interval,
+        start_date: recurringStartDate,
+        next_due_date: existing?.nextDueDate ?? recurringStartDate,
+        notes: recurringNotes.trim(),
+      };
+
+      let savedData;
+      let error;
+
+      if (editingRecurringId) {
+        const result = await supabase
+          .from("recurring_transactions")
+          .update(payload)
+          .eq("id", editingRecurringId)
+          .eq("user_id", userId)
+          .select()
+          .single();
+
+        savedData = result.data;
+        error = result.error;
+      } else {
+        const result = await supabase
+          .from("recurring_transactions")
+          .insert(payload)
+          .select()
+          .single();
+
+        savedData = result.data;
+        error = result.error;
+      }
+
+      if (error) throw error;
+
+      const savedItem: RecurringTransaction = {
+        id: savedData.id,
+        accountId: savedData.account_id,
+        title: savedData.title,
+        category: savedData.category,
+        amount: Number(savedData.amount),
+        type: savedData.type,
+        frequency: savedData.frequency,
+        intervalValue: savedData.interval_value,
+        startDate: savedData.start_date,
+        nextDueDate: savedData.next_due_date,
+        notes: savedData.notes ?? "",
+        isActive: savedData.is_active,
+      };
+
+      setRecurringTransactions((current) => {
+        const updated = editingRecurringId
+          ? current.map((item) =>
+              item.id === editingRecurringId ? savedItem : item,
+            )
+          : [...current, savedItem];
+
+        return updated.sort((a, b) =>
+          a.nextDueDate.localeCompare(b.nextDueDate),
+        );
+      });
+
+      setShowRecurringModal(false);
+      setEditingRecurringId(null);
+      notify(
+        editingRecurringId
+          ? "Jadwal berhasil diperbarui"
+          : "Jadwal berhasil ditambahkan",
+      );
+    } catch (error) {
+      console.error("Save recurring transaction error:", error);
+      notify("Gagal menyimpan jadwal transaksi");
+    } finally {
+      setIsSavingRecurring(false);
+    }
+  };
+
+  const toggleRecurringStatus = async (item: RecurringTransaction) => {
+    if (!userId) return;
+
+    const nextStatus = !item.isActive;
+
+    const { error } = await supabase
+      .from("recurring_transactions")
+      .update({
+        is_active: nextStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", item.id)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Update recurring status error:", error);
+      notify("Gagal mengubah status jadwal");
+      return;
+    }
+
+    setRecurringTransactions((current) =>
+      current.map((schedule) =>
+        schedule.id === item.id
+          ? { ...schedule, isActive: nextStatus }
+          : schedule,
+      ),
+    );
+
+    notify(nextStatus ? "Jadwal diaktifkan" : "Jadwal dijeda");
+  };
+
+  const deleteRecurringTransaction = async (item: RecurringTransaction) => {
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from("recurring_transactions")
+      .delete()
+      .eq("id", item.id)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Delete recurring transaction error:", error);
+      notify("Gagal menghapus jadwal");
+      return;
+    }
+
+    setRecurringTransactions((current) =>
+      current.filter((schedule) => schedule.id !== item.id),
+    );
+
+    notify("Jadwal berhasil dihapus");
+  };
+
+  const confirmRecurringTransaction = async (item: RecurringTransaction) => {
+    if (!userId || !isCloudReady) {
+      notify("Koneksi cloud belum siap");
+      return;
+    }
+
+    const today = toLocalDateOnly(new Date());
+
+    if (item.nextDueDate > today) {
+      notify("Jadwal ini belum jatuh tempo");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc(
+        "confirm_recurring_transaction",
+        { p_recurring_id: item.id },
+      );
+
+      if (error) throw error;
+
+      const transaction = data.transaction;
+      const category = categories.find(
+        (entry) =>
+          entry.name === transaction.category &&
+          entry.type === transaction.type,
+      );
+
+      const newTransaction: Transaction = {
+        id: transaction.id,
+        accountId: transaction.account_id,
+        categoryId: transaction.category_id ?? category?.id ?? null,
+        title: transaction.description,
+        category: transaction.category,
+        amount: Number(transaction.amount),
+        type: transaction.type,
+        date: transaction.transaction_date,
+      };
+
+      setTransactions((current) => [newTransaction, ...current]);
+
+      setRecurringTransactions((current) =>
+        current.map((schedule) =>
+          schedule.id === item.id
+            ? {
+                ...schedule,
+                nextDueDate: data.next_due_date,
+              }
+            : schedule,
+        ),
+      );
+
+      notify("Transaksi berhasil dikonfirmasi");
+    } catch (error) {
+      console.error("Confirm recurring transaction error:", error);
+
+      const message = error instanceof Error ? error.message : String(error);
+
+      notify(`Gagal: ${message}`);
+    }
   };
 
   const openAddGoal = () => {
@@ -2730,8 +3416,386 @@ function App() {
                 </div>
               )}
             </section>
+
+            <section className="section-block transfer-preview">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">MONEY MOVEMENT</p>
+                  <h2>Recent transfers</h2>
+                  <p className="history-account-name">
+                    Perpindahan saldo antar rekening
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="text-action"
+                  onClick={() => {
+                    setActivityView("transfers");
+                    setTransferAccountFilter("all");
+                    setActiveTab("Activity");
+                  }}
+                >
+                  See all <ChevronRight size={15} />
+                </button>
+              </div>
+
+              {transfers.length > 0 ? (
+                <div className="transaction-list">
+                  {transfers.slice(0, 3).map((item) => {
+                    const fromAccount = accounts.find(
+                      (account) => account.id === item.fromAccountId,
+                    );
+
+                    const toAccount = accounts.find(
+                      (account) => account.id === item.toAccountId,
+                    );
+
+                    return (
+                      <div
+                        className="transaction-item transfer-history-item"
+                        key={item.id}
+                      >
+                        <div className="transaction-icon transfer">
+                          <ArrowDownUp size={19} />
+                        </div>
+
+                        <div className="transaction-copy">
+                          <strong>
+                            {item.description || "Transfer antar rekening"}
+                          </strong>
+                          <span>
+                            {fromAccount?.nickname ?? "Rekening asal"}
+                            {" → "}
+                            {toAccount?.nickname ?? "Rekening tujuan"}
+                          </span>
+                          <span>{formatDate(item.transferDate)}</span>
+                        </div>
+
+                        <strong className="transaction-amount transfer">
+                          {rupiah(item.amount)}
+                        </strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="empty-activity">
+                  <div className="activity-empty-icon">
+                    <ArrowDownUp size={21} />
+                  </div>
+                  <strong>Belum ada transfer</strong>
+                  <span>
+                    Riwayat perpindahan saldo antar rekening akan muncul di
+                    sini.
+                  </span>
+                </div>
+              )}
+            </section>
+
+            <section className="section-block recurring-preview">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">AUTOMATED PLANNING</p>
+                  <h2>Recurring transactions</h2>
+                  <p className="history-account-name">
+                    Jadwal pemasukan dan pengeluaran rutin
+                  </p>
+                </div>
+
+                <button
+                  className="text-action"
+                  onClick={openAddRecurring}
+                  disabled={accounts.length === 0}
+                >
+                  <Plus size={15} /> Add schedule
+                </button>
+              </div>
+
+              {recurringTransactions.length > 0 ? (
+                <div className="recurring-list">
+                  {recurringTransactions.map((item) => {
+                    const account = accounts.find(
+                      (entry) => entry.id === item.accountId,
+                    );
+                    const isDue =
+                      item.isActive &&
+                      item.nextDueDate <= toLocalDateOnly(new Date());
+
+                    const frequencyLabel = {
+                      daily: "Daily",
+                      weekly: "Weekly",
+                      monthly: "Monthly",
+                      yearly: "Yearly",
+                    }[item.frequency];
+
+                    return (
+                      <div className="recurring-item" key={item.id}>
+                        <div className={`recurring-icon ${item.type}`}>
+                          <Repeat size={19} />
+                        </div>
+
+                        <div className="recurring-copy">
+                          <strong>{item.title}</strong>
+                          <span>
+                            {account?.nickname ?? "Account"} · {item.category}
+                          </span>
+                          <span>
+                            {frequencyLabel}
+                            {item.intervalValue > 1
+                              ? ` · Every ${item.intervalValue}`
+                              : ""}{" "}
+                            · {formatDate(item.nextDueDate)}
+                          </span>
+                          <span
+                            className={`recurring-status ${
+                              !item.isActive
+                                ? "paused"
+                                : isDue
+                                  ? "due"
+                                  : "upcoming"
+                            }`}
+                          >
+                            {!item.isActive
+                              ? "Paused"
+                              : isDue
+                                ? "Due"
+                                : "Upcoming"}
+                          </span>
+                        </div>
+
+                        <div className="recurring-side">
+                          <strong className={item.type}>
+                            {item.type === "income" ? "+" : "-"}
+                            {rupiah(item.amount)}
+                          </strong>
+
+                          {isDue && (
+                            <button
+                              type="button"
+                              className="small-action"
+                              onClick={() => confirmRecurringTransaction(item)}
+                            >
+                              Confirm
+                            </button>
+                          )}
+
+                          <div className="recurring-actions">
+                            <button
+                              type="button"
+                              className="icon-button"
+                              title="Edit schedule"
+                              onClick={() => openEditRecurring(item)}
+                            >
+                              <Pencil size={15} />
+                            </button>
+
+                            <button
+                              type="button"
+                              className="icon-button"
+                              title={
+                                item.isActive
+                                  ? "Pause schedule"
+                                  : "Activate schedule"
+                              }
+                              onClick={() => toggleRecurringStatus(item)}
+                            >
+                              {item.isActive ? "Ⅱ" : "▶"}
+                            </button>
+
+                            <button
+                              type="button"
+                              className="icon-button"
+                              title="Delete schedule"
+                              onClick={() => deleteRecurringTransaction(item)}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="empty-activity">
+                  <div className="activity-empty-icon">
+                    <Repeat size={21} />
+                  </div>
+                  <strong>No recurring schedules</strong>
+                  <span>
+                    Jadwalkan pembayaran atau pemasukan rutin agar lebih mudah
+                    dipantau.
+                  </span>
+                  <button
+                    className="small-action"
+                    onClick={openAddRecurring}
+                    disabled={accounts.length === 0}
+                  >
+                    <Plus size={14} /> Create schedule
+                  </button>
+                </div>
+              )}
+            </section>
           </div>
         )}
+
+        {activeTab === "Home" && (
+          <section className="section-block recurring-preview">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">PAYMENT MANAGEMENT</p>
+                <h2>Bill & Payment Reminder</h2>
+                <p className="history-account-name">
+                  Pantau tagihan dan jadwal pembayaran
+                </p>
+              </div>
+
+              <button
+                className="text-action"
+                onClick={openAddBill}
+                disabled={accounts.length === 0}
+              >
+                <Plus size={15} /> Add bill
+              </button>
+            </div>
+
+            {billReminders.length > 0 ? (
+              <div className="recurring-list">
+                {billReminders.map((item) => {
+                  const account = accounts.find(
+                    (entry) => entry.id === item.accountId,
+                  );
+
+                  const todayDate = toLocalDateOnly(new Date());
+                  const daysUntilDue = Math.ceil(
+                    (new Date(`${item.nextDueDate}T00:00:00`).getTime() -
+                      new Date(`${todayDate}T00:00:00`).getTime()) /
+                      86400000,
+                  );
+
+                  const isOverdue = item.isActive && daysUntilDue < 0;
+                  const isDueToday = item.isActive && daysUntilDue === 0;
+                  const isDue = isOverdue || isDueToday;
+                  const isReminder =
+                    item.isActive &&
+                    daysUntilDue > 0 &&
+                    daysUntilDue <= item.reminderDaysBefore;
+
+                  const statusLabel = !item.isActive
+                    ? "Completed"
+                    : isOverdue
+                      ? "Overdue"
+                      : isDueToday
+                        ? "Due today"
+                        : isReminder
+                          ? "Upcoming · Reminder"
+                          : "Upcoming";
+
+                  const frequencyLabel = {
+                    once: "One time",
+                    weekly: "Weekly",
+                    monthly: "Monthly",
+                    yearly: "Yearly",
+                  }[item.frequency];
+
+                  return (
+                    <div className="recurring-item" key={item.id}>
+                      <div className="recurring-icon expense">
+                        <CalendarDays size={19} />
+                      </div>
+
+                      <div className="recurring-copy">
+                        <strong>{item.title}</strong>
+                        <span>
+                          {account?.nickname ?? "Account"} · {item.category}
+                        </span>
+                        <span>
+                          {frequencyLabel}
+                          {item.frequency !== "once" && item.intervalValue > 1
+                            ? ` · Every ${item.intervalValue}`
+                            : ""}
+                          {" · "}
+                          {formatDate(item.nextDueDate)}
+                        </span>
+                        <span
+                          className={`recurring-status ${
+                            !item.isActive
+                              ? "paused"
+                              : isOverdue || isDueToday
+                                ? "due"
+                                : "upcoming"
+                          }`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+
+                      <div className="recurring-side">
+                        <strong className="expense">
+                          -{rupiah(item.amount)}
+                        </strong>
+
+                        {isDue && (
+                          <button
+                            type="button"
+                            className="small-action"
+                            onClick={() => confirmBillPayment(item)}
+                            disabled={isConfirmingBill === item.id}
+                          >
+                            {isConfirmingBill === item.id
+                              ? "Processing..."
+                              : "Mark as paid"}
+                          </button>
+                        )}
+
+                        <div className="recurring-actions">
+                          <button
+                            type="button"
+                            className="icon-button"
+                            title="Edit bill"
+                            onClick={() => openEditBill(item)}
+                          >
+                            <Pencil size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            className="icon-button delete-action"
+                            title="Delete bill"
+                            onClick={() => deleteBillReminder(item)}
+                            disabled={isDeletingBill === item.id}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-activity">
+                <div className="activity-empty-icon">
+                  <CalendarDays size={21} />
+                </div>
+                <strong>No bill reminders yet</strong>
+                <span>
+                  Tagihan listrik, internet, dan pembayaran rutinmu akan muncul
+                  di sini.
+                </span>
+                <button
+                  className="small-action"
+                  onClick={openAddBill}
+                  disabled={accounts.length === 0}
+                >
+                  <Plus size={14} /> Add your first bill
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
         {activeTab === "Cards" && (
           <div className="page-content secondary-page">
             <p className="eyebrow">YOUR ACCOUNTS</p>
@@ -3640,98 +4704,393 @@ function App() {
           <div className="page-content secondary-page">
             <p className="eyebrow">MONEY MOVEMENT</p>
             <h1>Activity</h1>
+
             <p className="subheading">
-              {selectedAccount
-                ? `Riwayat ${selectedAccount.nickname}`
-                : "Pilih rekening untuk melihat riwayat."}
+              {activityView === "transactions"
+                ? selectedAccount
+                  ? `Riwayat ${selectedAccount.nickname}`
+                  : "Pilih rekening untuk melihat riwayat."
+                : "Riwayat perpindahan saldo antar rekening."}
             </p>
 
-            {accounts.length > 0 && (
-              <div className="account-filter">
-                {accounts.map((account) => (
-                  <button
-                    key={account.id}
-                    className={selectedId === account.id ? "filter-active" : ""}
-                    onClick={() => setSelectedId(account.id)}
-                  >
-                    {account.nickname}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="account-filter activity-view-switch">
+              <button
+                type="button"
+                className={
+                  activityView === "transactions" ? "filter-active" : ""
+                }
+                onClick={() => setActivityView("transactions")}
+              >
+                Transactions
+              </button>
 
-            {selectedTransactions.length > 0 ? (
-              <div className="transaction-list activity-full-list">
-                {selectedTransactions.map((transaction) => (
-                  <div
-                    className="transaction-item transaction-clickable"
-                    key={transaction.id}
-                    onClick={() => openTransactionDetail(transaction)}
-                  >
-                    <div className={`transaction-icon ${transaction.type}`}>
-                      {transaction.type === "income" ? (
-                        <ArrowDownLeft size={19} />
-                      ) : (
-                        <ArrowUpRight size={19} />
+              <button
+                type="button"
+                className={activityView === "transfers" ? "filter-active" : ""}
+                onClick={() => setActivityView("transfers")}
+              >
+                Transfers
+              </button>
+            </div>
+
+            {activityView === "transactions" ? (
+              <>
+                {accounts.length > 0 && (
+                  <>
+                    <div className="activity-account-switcher">
+                      <button
+                        type="button"
+                        className="activity-switch-arrow"
+                        aria-label="Rekening sebelumnya"
+                        onClick={() => {
+                          const currentIndex = accounts.findIndex(
+                            (account) => account.id === selectedId,
+                          );
+                          const previousIndex =
+                            currentIndex <= 0
+                              ? accounts.length - 1
+                              : currentIndex - 1;
+
+                          setSelectedId(accounts[previousIndex].id);
+                        }}
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+
+                      {selectedAccount && (
+                        <div className="activity-account-card">
+                          <div
+                            className={`activity-card-brand ${getOption(selectedAccount.bank).style}`}
+                          >
+                            <span>{getOption(selectedAccount.bank).label}</span>
+                            <CreditCard size={20} />
+                          </div>
+
+                          <div className="activity-card-details">
+                            <div>
+                              <span>SELECTED ACCOUNT</span>
+                              <strong>{selectedAccount.nickname}</strong>
+                            </div>
+                            <div className="activity-card-balance">
+                              <span>AVAILABLE BALANCE</span>
+                              <strong>
+                                {rupiah(getAccountBalance(selectedAccount.id))}
+                              </strong>
+                            </div>
+                          </div>
+
+                          <div className="activity-card-footer">
+                            <span>
+                              •••• {selectedAccount.number.slice(-4) || "0000"}
+                            </span>
+                            <span>
+                              {accounts.findIndex(
+                                (item) => item.id === selectedId,
+                              ) + 1}
+                              {" / "}
+                              {accounts.length}
+                            </span>
+                          </div>
+                        </div>
                       )}
-                    </div>
-
-                    <div className="transaction-copy">
-                      <strong>{transaction.title}</strong>
-                      <span>
-                        {transaction.category} · {formatDate(transaction.date)}
-                      </span>
-                    </div>
-
-                    <strong
-                      className={`transaction-amount ${transaction.type}`}
-                    >
-                      {transaction.type === "income" ? "+" : "-"}
-                      {rupiah(transaction.amount)}
-                    </strong>
-
-                    <div
-                      className="transaction-actions"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => openEditTransaction(transaction)}
-                        aria-label="Edit transaksi"
-                        title="Edit transaksi"
-                      >
-                        <Pencil size={15} />
-                      </button>
 
                       <button
                         type="button"
-                        className="transaction-delete-action"
-                        onClick={() => setTransactionToDelete(transaction)}
-                        aria-label="Hapus transaksi"
-                        title="Hapus transaksi"
+                        className="activity-switch-arrow"
+                        aria-label="Rekening berikutnya"
+                        onClick={() => {
+                          const currentIndex = accounts.findIndex(
+                            (account) => account.id === selectedId,
+                          );
+                          const nextIndex =
+                            currentIndex >= accounts.length - 1
+                              ? 0
+                              : currentIndex + 1;
+
+                          setSelectedId(accounts[nextIndex].id);
+                        }}
                       >
-                        <Trash2 size={15} />
+                        <ChevronRight size={20} />
                       </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="large-empty">
-                <Activity size={30} />
-                <strong>Belum ada transaksi</strong>
-                <span>
-                  Riwayat transaksi rekening terpilih akan muncul di sini.
-                </span>
-                {selectedAccount && (
-                  <button
-                    className="primary-button"
-                    onClick={() => setShowTransactionModal(true)}
-                  >
-                    <Plus size={16} /> Add transaction
-                  </button>
+
+                    <div className="activity-type-filter">
+                      {(["all", "income", "expense"] as const).map((filter) => (
+                        <button
+                          key={filter}
+                          type="button"
+                          className={
+                            transactionTypeFilter === filter
+                              ? "filter-active"
+                              : ""
+                          }
+                          onClick={() => setTransactionTypeFilter(filter)}
+                        >
+                          {filter === "all"
+                            ? "All transactions"
+                            : filter === "income"
+                              ? "Income"
+                              : "Expense"}
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
-              </div>
+
+                {selectedTransactions.length > 0 ? (
+                  <div className="transaction-list activity-full-list">
+                    {selectedTransactions.map((transaction) => (
+                      <div
+                        className="transaction-item transaction-clickable"
+                        key={transaction.id}
+                        onClick={() => openTransactionDetail(transaction)}
+                      >
+                        <div className={`transaction-icon ${transaction.type}`}>
+                          {transaction.type === "income" ? (
+                            <ArrowDownLeft size={19} />
+                          ) : (
+                            <ArrowUpRight size={19} />
+                          )}
+                        </div>
+
+                        <div className="transaction-copy">
+                          <strong>{transaction.title}</strong>
+                          <span>
+                            {transaction.category} ·{" "}
+                            {formatDate(transaction.date)}
+                          </span>
+                        </div>
+
+                        <strong
+                          className={`transaction-amount ${transaction.type}`}
+                        >
+                          {transaction.type === "income" ? "+" : "-"}
+                          {rupiah(transaction.amount)}
+                        </strong>
+
+                        <div
+                          className="transaction-actions"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => openEditTransaction(transaction)}
+                            aria-label="Edit transaksi"
+                            title="Edit transaksi"
+                          >
+                            <Pencil size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            className="transaction-delete-action"
+                            onClick={() => setTransactionToDelete(transaction)}
+                            aria-label="Hapus transaksi"
+                            title="Hapus transaksi"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="large-empty">
+                    <Activity size={30} />
+                    <strong>Belum ada transaksi</strong>
+                    <span>
+                      Riwayat transaksi rekening terpilih akan muncul di sini.
+                    </span>
+
+                    {selectedAccount && (
+                      <button
+                        className="primary-button"
+                        onClick={() => setShowTransactionModal(true)}
+                      >
+                        <Plus size={16} /> Add transaction
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="activity-account-switcher transfer-account-switcher">
+                  <button
+                    type="button"
+                    className="activity-switch-arrow"
+                    aria-label="Filter rekening sebelumnya"
+                    onClick={() => {
+                      const currentIndex = accounts.findIndex(
+                        (account) => account.id === transferAccountFilter,
+                      );
+                      const previousIndex =
+                        transferAccountFilter === "all"
+                          ? accounts.length - 1
+                          : currentIndex <= 0
+                            ? -1
+                            : currentIndex - 1;
+
+                      setTransferAccountFilter(
+                        previousIndex === -1
+                          ? "all"
+                          : accounts[previousIndex].id,
+                      );
+                    }}
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+
+                  <div className="activity-account-card transfer-account-card">
+                    {transferAccountFilter === "all" ? (
+                      <>
+                        <div className="activity-card-brand all-accounts-brand">
+                          <span>ALL ACCOUNTS</span>
+                          <Wallet size={20} />
+                        </div>
+                        <div className="activity-card-details">
+                          <div>
+                            <span>TRANSFER HISTORY</span>
+                            <strong>All accounts</strong>
+                          </div>
+                          <div className="activity-card-balance">
+                            <span>CONNECTED ACCOUNTS</span>
+                            <strong>{accounts.length} accounts</strong>
+                          </div>
+                        </div>
+                        <div className="activity-card-footer">
+                          <span>Incoming & outgoing transfers</span>
+                          <span>ALL</span>
+                        </div>
+                      </>
+                    ) : (
+                      (() => {
+                        const account = accounts.find(
+                          (item) => item.id === transferAccountFilter,
+                        );
+
+                        if (!account) return null;
+
+                        return (
+                          <>
+                            <div
+                              className={`activity-card-brand ${getOption(account.bank).style}`}
+                            >
+                              <span>{getOption(account.bank).label}</span>
+                              <CreditCard size={20} />
+                            </div>
+                            <div className="activity-card-details">
+                              <div>
+                                <span>TRANSFER HISTORY</span>
+                                <strong>{account.nickname}</strong>
+                              </div>
+                              <div className="activity-card-balance">
+                                <span>AVAILABLE BALANCE</span>
+                                <strong>
+                                  {rupiah(getAccountBalance(account.id))}
+                                </strong>
+                              </div>
+                            </div>
+                            <div className="activity-card-footer">
+                              <span>
+                                •••• {account.number.slice(-4) || "0000"}
+                              </span>
+                              <span>
+                                {accounts.findIndex(
+                                  (item) => item.id === account.id,
+                                ) + 1}
+                                {" / "}
+                                {accounts.length}
+                              </span>
+                            </div>
+                          </>
+                        );
+                      })()
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="activity-switch-arrow"
+                    aria-label="Filter rekening berikutnya"
+                    onClick={() => {
+                      const currentIndex = accounts.findIndex(
+                        (account) => account.id === transferAccountFilter,
+                      );
+                      const nextIndex =
+                        transferAccountFilter === "all"
+                          ? 0
+                          : currentIndex >= accounts.length - 1
+                            ? -1
+                            : currentIndex + 1;
+
+                      setTransferAccountFilter(
+                        nextIndex === -1 ? "all" : accounts[nextIndex].id,
+                      );
+                    }}
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+
+                {filteredTransfers.length > 0 ? (
+                  <div className="transaction-list activity-full-list">
+                    {filteredTransfers.map((item) => {
+                      const fromAccount = accounts.find(
+                        (account) => account.id === item.fromAccountId,
+                      );
+
+                      const toAccount = accounts.find(
+                        (account) => account.id === item.toAccountId,
+                      );
+
+                      return (
+                        <div
+                          className="transaction-item transfer-history-item"
+                          key={item.id}
+                        >
+                          <div className="transaction-icon transfer">
+                            <ArrowDownUp size={19} />
+                          </div>
+
+                          <div className="transaction-copy">
+                            <strong>
+                              {item.description || "Transfer antar rekening"}
+                            </strong>
+                            <span>
+                              {fromAccount?.nickname ?? "Rekening asal"}
+                              {" → "}
+                              {toAccount?.nickname ?? "Rekening tujuan"}
+                            </span>
+                            <span>{formatDate(item.transferDate)}</span>
+                          </div>
+
+                          <strong className="transaction-amount transfer">
+                            {rupiah(item.amount)}
+                          </strong>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="large-empty">
+                    <ArrowDownUp size={30} />
+                    <strong>Belum ada transfer</strong>
+                    <span>
+                      Riwayat transfer antar rekening akan muncul di sini.
+                    </span>
+
+                    {accounts.length >= 2 && (
+                      <button
+                        className="primary-button"
+                        onClick={openTransferModal}
+                      >
+                        <ArrowDownUp size={16} /> New transfer
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -4390,6 +5749,335 @@ function App() {
                 disabled={isSavingTransfer}
               >
                 {isSavingTransfer ? "Processing..." : "Confirm transfer"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showRecurringModal && (
+        <div className="modal-backdrop" onClick={closeRecurringModal}>
+          <div
+            className="account-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">RECURRING SETUP</p>
+                <h2>{editingRecurringId ? "Edit schedule" : "New schedule"}</h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closeRecurringModal}
+                disabled={isSavingRecurring}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={saveRecurringTransaction}>
+              <div className="transaction-type-switch">
+                <button
+                  type="button"
+                  className={
+                    recurringType === "expense" ? "expense-active" : ""
+                  }
+                  onClick={() => {
+                    setRecurringType("expense");
+                    setRecurringCategory(
+                      categories.find((category) => category.type === "expense")
+                        ?.name ?? "",
+                    );
+                  }}
+                >
+                  Expense
+                </button>
+
+                <button
+                  type="button"
+                  className={recurringType === "income" ? "income-active" : ""}
+                  onClick={() => {
+                    setRecurringType("income");
+                    setRecurringCategory(
+                      categories.find((category) => category.type === "income")
+                        ?.name ?? "",
+                    );
+                  }}
+                >
+                  Income
+                </button>
+              </div>
+
+              <label htmlFor="recurring-title">Description</label>
+              <input
+                id="recurring-title"
+                value={recurringTitle}
+                onChange={(event) => setRecurringTitle(event.target.value)}
+                placeholder="Contoh: Tagihan internet"
+                required
+              />
+
+              <label htmlFor="recurring-account">Account</label>
+              <select
+                id="recurring-account"
+                value={recurringAccountId}
+                onChange={(event) => setRecurringAccountId(event.target.value)}
+                required
+              >
+                <option value="">Select account</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.nickname} · {account.bank}
+                  </option>
+                ))}
+              </select>
+
+              <label htmlFor="recurring-category">Category</label>
+              <select
+                id="recurring-category"
+                value={recurringCategory}
+                onChange={(event) => setRecurringCategory(event.target.value)}
+                required
+              >
+                <option value="">Select category</option>
+                {categories
+                  .filter((category) => category.type === recurringType)
+                  .map((category) => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+              </select>
+
+              <label htmlFor="recurring-amount">Amount</label>
+              <div className="currency-input">
+                <span>Rp</span>
+                <input
+                  id="recurring-amount"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={recurringAmount}
+                  onChange={(event) => setRecurringAmount(event.target.value)}
+                  placeholder="0"
+                  required
+                />
+              </div>
+
+              <label htmlFor="recurring-frequency">Frequency</label>
+              <select
+                id="recurring-frequency"
+                value={recurringFrequency}
+                onChange={(event) =>
+                  setRecurringFrequency(
+                    event.target.value as RecurringTransaction["frequency"],
+                  )
+                }
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+
+              <label htmlFor="recurring-interval">Repeat every</label>
+              <input
+                id="recurring-interval"
+                type="number"
+                min="1"
+                step="1"
+                value={recurringInterval}
+                onChange={(event) => setRecurringInterval(event.target.value)}
+                required
+              />
+
+              <label htmlFor="recurring-start-date">First due date</label>
+              <input
+                id="recurring-start-date"
+                type="date"
+                value={recurringStartDate}
+                onChange={(event) => setRecurringStartDate(event.target.value)}
+                required
+              />
+
+              <label htmlFor="recurring-notes">Notes (optional)</label>
+              <input
+                id="recurring-notes"
+                value={recurringNotes}
+                onChange={(event) => setRecurringNotes(event.target.value)}
+                placeholder="Additional notes"
+              />
+
+              <button
+                className="primary-button full-button"
+                type="submit"
+                disabled={isSavingRecurring || accounts.length === 0}
+              >
+                {isSavingRecurring
+                  ? "Saving..."
+                  : editingRecurringId
+                    ? "Save changes"
+                    : "Create schedule"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showBillModal && (
+        <div className="modal-backdrop" onClick={closeBillModal}>
+          <div
+            className="account-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">BILL REMINDER</p>
+                <h2>
+                  {editingBillId ? "Edit bill reminder" : "New bill reminder"}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closeBillModal}
+                disabled={isSavingBill}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={saveBillReminder}>
+              <label htmlFor="bill-title">Bill name</label>
+              <input
+                id="bill-title"
+                value={billTitle}
+                onChange={(event) => setBillTitle(event.target.value)}
+                placeholder="Contoh: Internet bulanan"
+                required
+              />
+
+              <label htmlFor="bill-account">Payment account</label>
+              <select
+                id="bill-account"
+                value={billAccountId}
+                onChange={(event) => setBillAccountId(event.target.value)}
+                required
+              >
+                <option value="">Select account</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.nickname} · {account.bank}
+                  </option>
+                ))}
+              </select>
+
+              <label htmlFor="bill-category">Category</label>
+              <select
+                id="bill-category"
+                value={billCategory}
+                onChange={(event) => setBillCategory(event.target.value)}
+                required
+              >
+                <option value="">Select category</option>
+                {categories
+                  .filter((category) => category.type === "expense")
+                  .map((category) => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+              </select>
+
+              <label htmlFor="bill-amount">Amount</label>
+              <div className="currency-input">
+                <span>Rp</span>
+                <input
+                  id="bill-amount"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={billAmount}
+                  onChange={(event) => setBillAmount(event.target.value)}
+                  placeholder="0"
+                  required
+                />
+              </div>
+
+              <label htmlFor="bill-frequency">Billing frequency</label>
+              <select
+                id="bill-frequency"
+                value={billFrequency}
+                onChange={(event) =>
+                  setBillFrequency(
+                    event.target.value as BillReminder["frequency"],
+                  )
+                }
+              >
+                <option value="once">One time</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+
+              {billFrequency !== "once" && (
+                <>
+                  <label htmlFor="bill-interval">Repeat every</label>
+                  <input
+                    id="bill-interval"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={billInterval}
+                    onChange={(event) => setBillInterval(event.target.value)}
+                    required
+                  />
+                </>
+              )}
+
+              <label htmlFor="bill-due-date">Next due date</label>
+              <input
+                id="bill-due-date"
+                type="date"
+                value={billDueDate}
+                onChange={(event) => setBillDueDate(event.target.value)}
+                required
+              />
+
+              <label htmlFor="bill-reminder-days">
+                Remind me before (days)
+              </label>
+              <input
+                id="bill-reminder-days"
+                type="number"
+                min="0"
+                max="30"
+                value={billReminderDays}
+                onChange={(event) => setBillReminderDays(event.target.value)}
+                required
+              />
+
+              <label htmlFor="bill-notes">Notes (optional)</label>
+              <input
+                id="bill-notes"
+                value={billNotes}
+                onChange={(event) => setBillNotes(event.target.value)}
+                placeholder="Additional notes"
+              />
+
+              <button
+                className="primary-button full-button"
+                type="submit"
+                disabled={isSavingBill || accounts.length === 0}
+              >
+                {isSavingBill
+                  ? "Saving..."
+                  : editingBillId
+                    ? "Save changes"
+                    : "Create reminder"}
               </button>
             </form>
           </div>

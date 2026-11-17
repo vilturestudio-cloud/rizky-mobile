@@ -4047,3 +4047,575 @@ button:disabled {
 .transfer-text-action:hover {
   opacity: 0.75;
 }
+
+/* =========================================
+   RECURRING TRANSACTIONS
+   VILTURE FINANCE — DARK SYSTEM
+========================================= */
+
+.recurring-preview {
+  margin-top: 22px;
+  padding: 20px 17px;
+  background: var(--vf-surface) !important;
+  border: 1px solid var(--vf-line);
+  border-radius: 3px;
+  color: var(--vf-text);
+}
+
+.recurring-preview .section-heading {
+  align-items: center;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--vf-line);
+}
+
+.recurring-preview .section-heading h2 {
+  color: var(--vf-text);
+  font-size: 16px;
+}
+
+.recurring-preview .history-account-name {
+  color: var(--vf-muted);
+  font-size: 10px;
+}
+
+.recurring-preview .text-action {
+  color: var(--vf-accent);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.recurring-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.recurring-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 17px 0;
+  border-bottom: 1px solid var(--vf-line);
+}
+
+.recurring-item:last-child {
+  border-bottom: none;
+  padding-bottom: 2px;
+}
+
+.recurring-icon {
+  width: 39px;
+  height: 39px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--vf-line-strong);
+  border-radius: 2px;
+  background: var(--vf-surface-2);
+  color: var(--vf-accent);
+}
+
+.recurring-icon.income {
+  color: var(--vf-income);
+}
+
+.recurring-icon.expense {
+  color: var(--vf-danger);
+}
+
+.recurring-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.recurring-copy strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vf-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.recurring-copy > span:not(.recurring-status) {
+  color: var(--vf-muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.recurring-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 7px;
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: var(--vf-surface-2);
+  color: var(--vf-text-soft);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+.recurring-status.due {
+  color: var(--vf-accent);
+  border-color: rgba(53, 214, 196, 0.35);
+  background: rgba(53, 214, 196, 0.07);
+}
+
+.recurring-status.upcoming {
+  color: var(--vf-text-soft);
+}
+
+.recurring-status.paused {
+  color: var(--vf-muted);
+  border-color: var(--vf-line);
+  background: transparent;
+}
+
+.recurring-side {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 9px;
+}
+
+.recurring-side > strong {
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.recurring-side > strong.income {
+  color: var(--vf-income);
+}
+
+.recurring-side > strong.expense {
+  color: var(--vf-danger);
+}
+
+.recurring-side .small-action {
+  min-height: 29px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid rgba(53, 214, 196, 0.4);
+  border-radius: 2px;
+  background: rgba(53, 214, 196, 0.08);
+  color: var(--vf-accent);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.recurring-side .small-action:hover {
+  background: rgba(53, 214, 196, 0.16);
+}
+
+.recurring-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.recurring-actions button.icon-button {
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--vf-muted);
+  cursor: pointer;
+}
+
+.recurring-actions button.icon-button:hover {
+  border-color: var(--vf-accent);
+  color: var(--vf-accent);
+}
+
+.recurring-actions button.icon-button:last-child:hover {
+  border-color: var(--vf-danger);
+  color: var(--vf-danger);
+}
+
+.recurring-preview .empty-activity {
+  min-height: 135px;
+  margin-top: 14px;
+  border: 1px dashed var(--vf-line-strong);
+  border-radius: 2px;
+  background: var(--vf-surface-2);
+}
+
+.recurring-preview .empty-activity strong {
+  color: var(--vf-text);
+}
+
+.recurring-preview .empty-activity > span {
+  color: var(--vf-muted);
+}
+
+.recurring-preview .activity-empty-icon {
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: var(--vf-surface-3);
+  color: var(--vf-accent);
+}
+
+@media (max-width: 380px) {
+  .recurring-preview {
+    padding: 16px 12px;
+  }
+
+  .recurring-item {
+    gap: 8px;
+  }
+
+  .recurring-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .recurring-side > strong {
+    font-size: 9px;
+  }
+
+  .recurring-actions {
+    gap: 3px;
+  }
+
+  .recurring-actions button.icon-button {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+/* =========================================
+   TRANSFER HISTORY
+========================================= */
+
+.transfer-preview {
+  margin-top: 0;
+  padding: 22px 0;
+  border-top: 1px solid var(--vf-line);
+}
+
+.transfer-preview .section-heading h2 {
+  color: var(--vf-text);
+}
+
+.transfer-history-item {
+  gap: 10px;
+}
+
+.transfer-history-item .transaction-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.transfer-history-item .transaction-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.transfer-history-item .transaction-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transfer-history-item .transaction-copy span {
+  line-height: 1.5;
+}
+
+.transaction-amount.transfer {
+  color: var(--vf-accent);
+  white-space: nowrap;
+}
+
+.activity-view-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 20px;
+  padding: 0;
+  border: 1px solid var(--vf-line);
+  overflow: visible;
+}
+
+.activity-view-switch button {
+  min-width: 0;
+  border: 0;
+  border-radius: 0 !important;
+  background: transparent;
+  color: var(--vf-muted);
+  text-align: center;
+}
+
+.activity-view-switch button + button {
+  border-left: 1px solid var(--vf-line);
+}
+
+.activity-view-switch button.filter-active {
+  background: var(--vf-surface-3);
+  border-color: var(--vf-line);
+  color: var(--vf-accent);
+}
+
+.activity-transfer-filter {
+  margin-top: 15px;
+}
+
+/* =========================================
+   ACTIVITY — COMPACT SIZING
+========================================= */
+
+/* Transactions / Transfers */
+.activity-view-switch {
+  width: 100%;
+  margin-top: 18px;
+  min-height: 23px;
+}
+
+.activity-view-switch button {
+  min-height: 22px;
+  padding: 3px 8px;
+  font-size: 8px;
+  letter-spacing: 0.2px;
+}
+
+/* Account filter */
+.activity-transfer-filter,
+.secondary-page > .account-filter:not(.activity-view-switch) {
+  gap: 5px;
+  margin-top: 15px;
+  padding-bottom: 0;
+}
+
+.secondary-page > .account-filter button {
+  min-height: 23px;
+  padding: 4px 9px;
+  font-size: 8px;
+}
+
+/* Empty state */
+.secondary-page .large-empty {
+  min-height: 157px;
+  margin-top: 21px;
+  padding: 15px;
+  gap: 7px;
+  border-radius: 2px !important;
+}
+
+.secondary-page .large-empty > svg {
+  width: 21px;
+  height: 21px;
+}
+
+.secondary-page .large-empty strong {
+  font-size: 9px;
+}
+
+.secondary-page .large-empty span {
+  max-width: 190px;
+  font-size: 7px;
+  line-height: 1.5;
+}
+
+/* Add transaction button */
+.secondary-page .large-empty .primary-button {
+  min-height: 30px;
+  height: 30px;
+  margin-top: 2px;
+  padding: 0 13px;
+  gap: 6px;
+  border-radius: 2px !important;
+  font-size: 8px;
+}
+
+.secondary-page .large-empty .primary-button svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Transfer history list */
+.secondary-page .activity-full-list {
+  margin-top: 20px;
+}
+
+@media (max-width: 380px) {
+  .secondary-page .large-empty {
+    min-height: 157px;
+    padding: 12px;
+  }
+}
+
+/* DELETE */
+
+.recurring-actions .delete-action {
+  color: #e05252;
+}
+
+.recurring-actions .delete-action:hover {
+  background: rgba(224, 82, 82, 0.1);
+}
+
+/* ACTIVITY ACCOUNT CARD SWITCHER */
+
+.activity-account-switcher {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 20px;
+  width: 100%;
+}
+
+.activity-switch-arrow {
+  width: 31px;
+  height: 31px;
+  flex: 0 0 31px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--vf-line);
+  border-radius: 50%;
+  background: var(--vf-surface);
+  color: var(--vf-text);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.activity-switch-arrow:active {
+  background: var(--vf-surface-3);
+}
+
+.activity-account-card {
+  flex: 1;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--vf-line);
+  background: var(--vf-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.activity-card-brand {
+  min-height: 42px;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 3px;
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.activity-card-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.activity-card-details > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.activity-card-details span {
+  color: var(--vf-muted);
+  font-size: 7px;
+  letter-spacing: 0.8px;
+}
+
+.activity-card-details strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vf-text);
+  font-size: 11px;
+}
+
+.activity-card-balance {
+  text-align: right;
+}
+
+.activity-card-footer {
+  padding-top: 9px;
+  border-top: 1px solid var(--vf-line);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--vf-muted);
+  font-size: 8px;
+}
+
+.all-accounts-brand {
+  background: var(--vf-surface-3);
+  color: var(--vf-text);
+}
+
+.activity-type-filter {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin-top: 13px;
+  padding-bottom: 3px;
+  scrollbar-width: none;
+}
+
+.activity-type-filter::-webkit-scrollbar {
+  display: none;
+}
+
+.activity-type-filter button {
+  flex-shrink: 0;
+  min-height: 27px;
+  padding: 5px 11px;
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: var(--vf-surface);
+  color: var(--vf-muted);
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.activity-type-filter button.filter-active {
+  border-color: var(--vf-accent);
+  background: var(--vf-surface-3);
+  color: var(--vf-accent);
+}
+
+.activity-full-list {
+  margin-top: 15px;
+}
+
+@media (max-width: 360px) {
+  .activity-account-switcher {
+    gap: 6px;
+  }
+
+  .activity-switch-arrow {
+    width: 27px;
+    height: 27px;
+    flex-basis: 27px;
+  }
+
+  .activity-account-card {
+    padding: 11px;
+  }
+
+  .activity-card-details strong {
+    font-size: 10px;
+  }
+}
