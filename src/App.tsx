@@ -343,6 +343,23 @@ function App() {
     "1D" | "1W" | "1M" | "3M" | "1Y" | "ALL"
   >("1W");
 
+  // Zoom grafik: 1 = normal, 8 = zoom maksimal
+  const [goldChartZoom, setGoldChartZoom] = useState(1);
+
+  // Posisi horizontal grafik: 0 = kiri, 1 = kanan
+  const [goldChartPan, setGoldChartPan] = useState(0);
+
+  // Fokus legenda
+  const [goldChartFocus, setGoldChartFocus] = useState<
+    "both" | "sell" | "buyback"
+  >("both");
+
+  // Menyimpan posisi awal saat grafik sedang di-drag
+  const goldChartDragRef = useRef<{
+    x: number;
+    pan: number;
+  } | null>(null);
+
   const filteredGoldHistory = useMemo(() => {
     const now = new Date();
     const start = new Date(now);
@@ -372,19 +389,42 @@ function App() {
       .filter((item) => new Date(item.recorded_at) >= start)
       .map((item) => ({
         ...item,
-        chartTime: new Date(item.recorded_at).toLocaleDateString("id-ID", {
-          day: "2-digit",
-          month: "short",
-          year: goldChartPeriod === "ALL" ? "numeric" : undefined,
-          ...(goldChartPeriod === "1D"
-            ? {
-                hour: "2-digit",
-                minute: "2-digit",
-              }
-            : {}),
-        }),
+        timestamp: new Date(item.recorded_at).getTime(),
       }));
   }, [goldPriceHistory, goldChartPeriod]);
+
+  // Zoom in
+  const zoomGoldChartIn = () => {
+    setGoldChartZoom((current) => Math.min(8, current + 0.5));
+  };
+
+  // Zoom out
+  const zoomGoldChartOut = () => {
+    setGoldChartZoom((current) => {
+      const next = Math.max(1, current - 0.5);
+
+      if (next === 1) {
+        setGoldChartPan(0);
+      }
+
+      return next;
+    });
+  };
+
+  // Kembalikan grafik ke tampilan awal
+  const resetGoldChart = () => {
+    setGoldChartZoom(1);
+    setGoldChartPan(0);
+  };
+
+  // Ganti periode sekaligus reset zoom dan posisi
+  const changeGoldChartPeriod = (
+    period: "1D" | "1W" | "1M" | "3M" | "1Y" | "ALL",
+  ) => {
+    setGoldChartPeriod(period);
+    setGoldChartZoom(1);
+    setGoldChartPan(0);
+  };
 
   const [isGoldHistoryLoading, setIsGoldHistoryLoading] = useState(false);
 
@@ -5572,7 +5612,7 @@ function App() {
                       key={period}
                       type="button"
                       className={goldChartPeriod === period ? "active" : ""}
-                      onClick={() => setGoldChartPeriod(period)}
+                      onClick={() => changeGoldChartPeriod(period)}
                     >
                       {period}
                     </button>
@@ -5592,140 +5632,339 @@ function App() {
                 </div>
               ) : (
                 <>
+                  {/* INTERACTIVE LEGEND */}
                   <div className="gold-chart-legend">
-                    <span>
+                    <button
+                      type="button"
+                      className={goldChartFocus === "buyback" ? "muted" : ""}
+                      onClick={() =>
+                        setGoldChartFocus((current) =>
+                          current === "sell" ? "both" : "sell",
+                        )
+                      }
+                    >
                       <i className="gold-legend-sell" />
                       Sell price
-                    </span>
-                    <span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={goldChartFocus === "sell" ? "muted" : ""}
+                      onClick={() =>
+                        setGoldChartFocus((current) =>
+                          current === "buyback" ? "both" : "buyback",
+                        )
+                      }
+                    >
                       <i className="gold-legend-buyback" />
                       Buyback price
-                    </span>
+                    </button>
                   </div>
 
-                  <div className="gold-chart-container">
-                    <ResponsiveContainer width="100%" height={230}>
-                      <AreaChart
-                        data={filteredGoldHistory}
-                        margin={{ top: 12, right: 5, left: 5, bottom: 0 }}
+                  {/* CHART VIEWPORT */}
+                  <div
+                    className="gold-chart-viewport"
+                    onPointerDown={(event) => {
+                      if (goldChartZoom <= 1) return;
+
+                      goldChartDragRef.current = {
+                        x: event.clientX,
+                        pan: goldChartPan,
+                      };
+
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    }}
+                    onPointerMove={(event) => {
+                      const drag = goldChartDragRef.current;
+
+                      if (!drag || goldChartZoom <= 1) return;
+
+                      const maxShift =
+                        event.currentTarget.clientWidth * (goldChartZoom - 1);
+
+                      if (maxShift <= 0) return;
+
+                      const delta = event.clientX - drag.x;
+                      const nextPan = Math.max(
+                        0,
+                        Math.min(1, drag.pan - delta / maxShift),
+                      );
+
+                      setGoldChartPan(nextPan);
+                    }}
+                    onPointerUp={() => {
+                      goldChartDragRef.current = null;
+                    }}
+                    onPointerCancel={() => {
+                      goldChartDragRef.current = null;
+                    }}
+                  >
+                    <div
+                      className="gold-chart-inner"
+                      style={{
+                        width: `${goldChartZoom * 100}%`,
+                        transform: `translateX(-${
+                          goldChartPan *
+                          ((goldChartZoom - 1) / goldChartZoom) *
+                          100
+                        }%)`,
+                      }}
+                    >
+                      <ResponsiveContainer width="100%" height={250}>
+                        <AreaChart
+                          data={filteredGoldHistory}
+                          margin={{ top: 12, right: 12, left: 5, bottom: 0 }}
+                        >
+                          <defs>
+                            <linearGradient
+                              id="goldSellGradient"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor="#c69b48"
+                                stopOpacity={0.28}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="#c69b48"
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+
+                            <linearGradient
+                              id="goldBuybackGradient"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor="#559b83"
+                                stopOpacity={0.18}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="#559b83"
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                          </defs>
+
+                          <CartesianGrid
+                            stroke="currentColor"
+                            strokeOpacity={0.1}
+                            strokeDasharray="3 4"
+                            vertical={false}
+                          />
+
+                          <XAxis
+                            dataKey="timestamp"
+                            type="number"
+                            scale="time"
+                            domain={["dataMin", "dataMax"]}
+                            tickFormatter={(value: number) =>
+                              new Date(value).toLocaleDateString("id-ID", {
+                                day: goldChartZoom >= 2 ? "2-digit" : undefined,
+                                month: "short",
+                                year:
+                                  goldChartPeriod === "ALL" ||
+                                  (goldChartPeriod === "1Y" &&
+                                    goldChartZoom < 2)
+                                    ? "2-digit"
+                                    : undefined,
+                                ...(goldChartPeriod === "1D"
+                                  ? {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    }
+                                  : {}),
+                              })
+                            }
+                            tick={{ fontSize: 10, fill: "currentColor" }}
+                            tickLine={false}
+                            axisLine={false}
+                            minTickGap={25}
+                            tickCount={Math.max(
+                              5,
+                              Math.round(6 * goldChartZoom),
+                            )}
+                          />
+
+                          <YAxis
+                            domain={["auto", "auto"]}
+                            tickFormatter={(value: number) =>
+                              `${(value / 1000000).toFixed(2)}M`
+                            }
+                            tick={{ fontSize: 9, fill: "currentColor" }}
+                            tickLine={false}
+                            axisLine={false}
+                            width={48}
+                          />
+
+                          <Tooltip
+                            labelFormatter={(value) =>
+                              new Date(Number(value)).toLocaleString("id-ID", {
+                                day: "numeric",
+                                month: "long",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            }
+                            formatter={(value) =>
+                              value == null ? "—" : rupiah(Number(value))
+                            }
+                            contentStyle={{
+                              background: "var(--card-bg, #171717)",
+                              border: "1px solid var(--border-color, #333)",
+                              borderRadius: "10px",
+                              fontSize: "11px",
+                            }}
+                            labelStyle={{
+                              color: "var(--text-secondary, #999)",
+                            }}
+                          />
+
+                          <Area
+                            type="monotone"
+                            dataKey="sell_price"
+                            name="Sell price"
+                            stroke={
+                              goldChartFocus === "buyback"
+                                ? "#777777"
+                                : "#c69b48"
+                            }
+                            strokeOpacity={
+                              goldChartFocus === "buyback" ? 0.3 : 1
+                            }
+                            strokeWidth={goldChartFocus === "sell" ? 2.8 : 2}
+                            fill="url(#goldSellGradient)"
+                            fillOpacity={
+                              goldChartFocus === "buyback" ? 0.08 : 1
+                            }
+                            dot={false}
+                            activeDot={{ r: 4, strokeWidth: 0 }}
+                            isAnimationActive={false}
+                          />
+
+                          <Area
+                            type="monotone"
+                            dataKey="buyback_price"
+                            name="Buyback price"
+                            stroke={
+                              goldChartFocus === "sell" ? "#777777" : "#559b83"
+                            }
+                            strokeOpacity={goldChartFocus === "sell" ? 0.3 : 1}
+                            strokeWidth={goldChartFocus === "buyback" ? 2.8 : 2}
+                            fill="url(#goldBuybackGradient)"
+                            fillOpacity={goldChartFocus === "sell" ? 0.04 : 1}
+                            dot={false}
+                            activeDot={{ r: 4, strokeWidth: 0 }}
+                            connectNulls={false}
+                            isAnimationActive={false}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* ZOOM CONTROLS */}
+                  <div className="gold-chart-controls">
+                    <div className="gold-chart-zoom">
+                      <button
+                        type="button"
+                        onClick={zoomGoldChartOut}
+                        disabled={goldChartZoom <= 1}
+                        aria-label="Zoom out"
                       >
-                        <defs>
-                          <linearGradient
-                            id="goldSellGradient"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="0%"
-                              stopColor="#c69b48"
-                              stopOpacity={0.28}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#c69b48"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
+                        −
+                      </button>
 
-                          <linearGradient
-                            id="goldBuybackGradient"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="0%"
-                              stopColor="#559b83"
-                              stopOpacity={0.18}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#559b83"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
-                        </defs>
+                      <span>{goldChartZoom.toFixed(1)}×</span>
 
-                        <CartesianGrid
-                          stroke="currentColor"
-                          strokeOpacity={0.1}
-                          strokeDasharray="3 4"
-                          vertical={false}
-                        />
+                      <button
+                        type="button"
+                        onClick={zoomGoldChartIn}
+                        disabled={goldChartZoom >= 8}
+                        aria-label="Zoom in"
+                      >
+                        +
+                      </button>
+                    </div>
 
-                        <XAxis
-                          dataKey="chartTime"
-                          tick={{ fontSize: 10, fill: "currentColor" }}
-                          tickLine={false}
-                          axisLine={false}
-                          minTickGap={25}
-                        />
+                    <button
+                      type="button"
+                      className="gold-chart-reset"
+                      onClick={resetGoldChart}
+                    >
+                      Reset
+                    </button>
+                  </div>
 
-                        <YAxis
-                          domain={["auto", "auto"]}
-                          tickFormatter={(value: number) =>
-                            `${(value / 1000000).toFixed(2)}M`
-                          }
-                          tick={{ fontSize: 9, fill: "currentColor" }}
-                          tickLine={false}
-                          axisLine={false}
-                          width={48}
-                        />
+                  {/* HISTORY NAVIGATOR */}
+                  <div className="gold-chart-navigator">
+                    <div className="gold-navigator-heading">
+                      <span>HISTORY NAVIGATOR</span>
+                      <span>
+                        {goldChartZoom > 1
+                          ? "Drag chart or move slider"
+                          : "Zoom in to explore"}
+                      </span>
+                    </div>
 
-                        <Tooltip
-                          formatter={(value) => rupiah(Number(value))}
-                          contentStyle={{
-                            background: "var(--card-bg, #171717)",
-                            border: "1px solid var(--border-color, #333)",
-                            borderRadius: "10px",
-                            fontSize: "11px",
-                          }}
-                          labelStyle={{ color: "var(--text-secondary, #999)" }}
-                        />
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={Math.round(goldChartPan * 100)}
+                      disabled={goldChartZoom <= 1}
+                      onChange={(event) =>
+                        setGoldChartPan(Number(event.target.value) / 100)
+                      }
+                      aria-label="Navigate gold price history"
+                    />
 
-                        <Area
-                          type="monotone"
-                          dataKey="sell_price"
-                          name="Sell price"
-                          stroke="#c69b48"
-                          strokeWidth={2}
-                          fill="url(#goldSellGradient)"
-                          dot={false}
-                          activeDot={{ r: 4, strokeWidth: 0 }}
-                        />
+                    <div className="gold-navigator-dates">
+                      <span>
+                        {filteredGoldHistory.length > 0
+                          ? new Date(
+                              filteredGoldHistory[0].recorded_at,
+                            ).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : ""}
+                      </span>
 
-                        <Area
-                          type="monotone"
-                          dataKey="buyback_price"
-                          name="Buyback price"
-                          stroke="#559b83"
-                          strokeWidth={2}
-                          fill="url(#goldBuybackGradient)"
-                          dot={false}
-                          activeDot={{ r: 4, strokeWidth: 0 }}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                      <span>
+                        {filteredGoldHistory.length > 0
+                          ? new Date(
+                              filteredGoldHistory[
+                                filteredGoldHistory.length - 1
+                              ].recorded_at,
+                            ).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : ""}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="gold-chart-footer">
                     <span>
-                      {filteredGoldHistory.length} recorded price points
+                      {filteredGoldHistory.length.toLocaleString("id-ID")}{" "}
+                      recorded price points
                     </span>
-                    <span>
-                      Latest:{" "}
-                      {new Date(
-                        filteredGoldHistory[filteredGoldHistory.length - 1]
-                          .recorded_at,
-                      ).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </span>
+                    <span>{goldChartZoom.toFixed(1)}× zoom</span>
                   </div>
                 </>
               )}

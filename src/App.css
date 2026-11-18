@@ -5850,3 +5850,410 @@ button:disabled {
     font-size: 19px;
   }
 }
+
+/* =========================================
+   VILTURE GOLD — INTERACTIVE CHART
+========================================= */
+
+.gold-chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.gold-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.gold-legend-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.gold-legend-button i {
+  width: 14px;
+  height: 3px;
+  border-radius: 3px;
+}
+
+.gold-legend-button.sell i {
+  background: #c69b48;
+}
+
+.gold-legend-button.buyback i {
+  background: #559b83;
+}
+
+.gold-legend-button.sell.selected {
+  color: #c69b48;
+  background: rgba(198, 155, 72, 0.09);
+  border-color: rgba(198, 155, 72, 0.45);
+}
+
+.gold-legend-button.buyback.selected {
+  color: #559b83;
+  background: rgba(85, 155, 131, 0.09);
+  border-color: rgba(85, 155, 131, 0.45);
+}
+
+.gold-legend-button.muted {
+  opacity: 0.45;
+}
+
+/* Zoom buttons */
+
+.gold-chart-zoom {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gold-chart-zoom button {
+  min-width: 30px;
+  height: 29px;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.gold-chart-zoom button:last-child {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.gold-chart-zoom button:hover:not(:disabled) {
+  border-color: #c69b48;
+  color: #c69b48;
+}
+
+.gold-chart-zoom button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Interactive chart viewport */
+
+.gold-chart-viewport {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.gold-chart-viewport:active {
+  cursor: grabbing;
+}
+
+.gold-chart-container {
+  width: 100%;
+  min-width: 0;
+  height: 260px;
+}
+
+.gold-chart-container .recharts-responsive-container {
+  width: 100% !important;
+  height: 260px !important;
+}
+
+.gold-chart-container .recharts-surface {
+  overflow: visible;
+}
+
+.gold-chart-container .recharts-tooltip-cursor {
+  stroke: var(--border-color);
+  stroke-dasharray: 4 4;
+}
+
+/* Chart footer */
+
+.gold-chart-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 9px;
+}
+
+.gold-chart-hint {
+  margin: 9px 0 0;
+  color: var(--text-secondary);
+  font-size: 9px;
+  text-align: center;
+  opacity: 0.65;
+}
+
+@media (max-width: 600px) {
+  .gold-chart-toolbar {
+    align-items: flex-start;
+  }
+
+  .gold-chart-legend {
+    gap: 5px;
+  }
+
+  .gold-legend-button {
+    padding: 7px 8px;
+    font-size: 9px;
+  }
+
+  .gold-chart-zoom {
+    gap: 4px;
+  }
+
+  .gold-chart-zoom button {
+    min-width: 28px;
+    height: 28px;
+  }
+
+  .gold-chart-container {
+    height: 260px;
+  }
+
+  .gold-chart-footer {
+    font-size: 8px;
+  }
+}
+
+/* GOLD CHART - INTERACTIVE NAVIGATION */
+
+.gold-chart-viewport {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  border-radius: 10px;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.gold-chart-viewport:active {
+  cursor: grabbing;
+}
+
+.gold-chart-inner {
+  height: 250px;
+  min-width: 100%;
+  transition: width 0.18s ease;
+  will-change: transform;
+}
+
+.gold-chart-inner .recharts-responsive-container {
+  min-width: 0;
+}
+
+.gold-chart-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 12px 0 14px;
+}
+
+.gold-chart-legend button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary, currentColor);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.gold-chart-legend button.muted {
+  opacity: 0.38;
+}
+
+.gold-chart-legend button i {
+  display: inline-block;
+  width: 17px;
+  height: 3px;
+  border-radius: 5px;
+}
+
+.gold-legend-sell {
+  background: #c69b48;
+}
+
+.gold-legend-buyback {
+  background: #559b83;
+}
+
+/* ZOOM BUTTONS */
+
+.gold-chart-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 13px;
+}
+
+.gold-chart-zoom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 7px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 9px;
+}
+
+.gold-chart-zoom button {
+  width: 27px;
+  height: 25px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--surface-secondary, rgba(128, 128, 128, 0.1));
+  color: var(--text-primary, currentColor);
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.gold-chart-zoom button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.gold-chart-zoom span {
+  min-width: 35px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.gold-chart-reset {
+  padding: 6px 11px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary, #999);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* HISTORY SLIDER */
+
+.gold-chart-navigator {
+  margin-top: 18px;
+  padding: 12px 13px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 10px;
+  background: var(--surface-secondary, rgba(128, 128, 128, 0.045));
+}
+
+.gold-navigator-heading,
+.gold-navigator-dates {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.gold-navigator-heading {
+  margin-bottom: 11px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.7px;
+}
+
+.gold-navigator-heading span:first-child {
+  color: var(--text-primary, currentColor);
+}
+
+.gold-navigator-heading span:last-child,
+.gold-navigator-dates {
+  color: var(--text-secondary, #999);
+}
+
+.gold-navigator-heading span:last-child {
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.gold-chart-navigator input[type="range"] {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 20px;
+  outline: none;
+  background: var(--border-color, #444);
+  cursor: pointer;
+}
+
+.gold-chart-navigator input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border: 3px solid var(--card-bg, #171717);
+  border-radius: 50%;
+  background: #c69b48;
+  box-shadow: 0 0 0 1px #c69b48;
+}
+
+.gold-chart-navigator input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 3px solid var(--card-bg, #171717);
+  border-radius: 50%;
+  background: #c69b48;
+  box-shadow: 0 0 0 1px #c69b48;
+}
+
+.gold-chart-navigator input[type="range"]:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.gold-navigator-dates {
+  margin-top: 9px;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gold-chart-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 13px;
+  color: var(--text-secondary, #999);
+  font-size: 10px;
+}
