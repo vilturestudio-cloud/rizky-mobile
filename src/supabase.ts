@@ -15,7 +15,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-export async function ensureAnonymousSession() {
+// Mengirim OTP untuk login atau menghubungkan akun anonim ke email.
+export async function sendLoginOtp(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+
   const {
     data: { session },
     error: sessionError,
@@ -23,15 +26,56 @@ export async function ensureAnonymousSession() {
 
   if (sessionError) throw sessionError;
 
-  if (session) return session;
+  // Pertahankan UID akun anonim lama agar data tidak terputus.
+  if (session?.user.is_anonymous) {
+    console.log("OTP PATH: updateUser / email_change");
+    const { error } = await supabase.auth.updateUser({
+      email: normalizedEmail,
+    });
 
-  const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) throw error;
+
+    return { mode: "upgrade" as const };
+  }
+
+  // Login atau registrasi pengguna baru.
+  console.log("OTP PATH: signInWithOtp / magic_link_or_otp");
+  const { error } = await supabase.auth.signInWithOtp({
+    email: normalizedEmail,
+    options: {
+      shouldCreateUser: true,
+    },
+  });
+
+  if (error) throw error;
+
+  return { mode: "login" as const };
+}
+
+// Memverifikasi OTP.
+export async function verifyLoginOtp(
+  email: string,
+  token: string,
+  mode: "upgrade" | "login",
+) {
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: email.trim().toLowerCase(),
+    token: token.trim(),
+    type: mode === "upgrade" ? "email_change" : "email",
+  });
 
   if (error) throw error;
 
   if (!data.session) {
-    throw new Error("Gagal membuat sesi anonim Supabase.");
+    throw new Error("Verifikasi berhasil, tetapi sesi belum tersedia.");
   }
 
   return data.session;
+}
+
+// Mengakhiri sesi pengguna.
+export async function logoutUser() {
+  const { error } = await supabase.auth.signOut();
+
+  if (error) throw error;
 }

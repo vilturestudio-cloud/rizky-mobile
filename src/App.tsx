@@ -12,6 +12,7 @@ import {
   Zap,
   ChevronRight,
   CreditCard,
+  LogOut,
   Home,
   Target,
   ChartPie,
@@ -40,7 +41,7 @@ import {
 
 import "./App.css";
 import { createWorker } from "tesseract.js";
-import { ensureAnonymousSession, supabase } from "./supabase";
+import { supabase, sendLoginOtp, verifyLoginOtp, logoutUser } from "./supabase";
 
 type Account = {
   id: string;
@@ -692,6 +693,14 @@ function App() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isCloudReady, setIsCloudReady] = useState(false);
   const [cloudError, setCloudError] = useState("");
+  // AUTHENTICATION
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginOtp, setLoginOtp] = useState("");
+  const [loginMode, setLoginMode] = useState<"login" | "upgrade">("login");
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [isLoginLoading, setIsLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
   useEffect(() => {
     if (!isCloudReady) return;
 
@@ -722,9 +731,25 @@ function App() {
 
     const initializeCloud = async () => {
       try {
-        const session = await ensureAnonymousSession();
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError) throw sessionError;
+        console.log("OTP FLOW CHECK:", {
+          hasSession: !!session,
+          isAnonymous: session?.user?.is_anonymous ?? null,
+        });
+
+        // Belum login atau masih menggunakan akun anonim.
+        if (!session || session.user.is_anonymous) {
+          setUserId(null);
+          setIsCloudReady(false);
+          return;
+        }
+
         const uid = session.user.id;
-        if (cancelled) return;
         setUserId(uid);
 
         const [
@@ -978,14 +1003,20 @@ function App() {
         setIsCloudReady(true);
       } catch (error) {
         console.error("Supabase initialization error:", error);
+
         if (!cancelled) {
           setCloudError(
             error instanceof Error
               ? error.message
               : "Gagal menghubungkan Supabase.",
           );
+
           console.error("CLOUD ERROR DETAIL:", error);
           notify("Gagal menghubungkan ke cloud");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsAuthChecking(false);
         }
       }
     };
@@ -1299,6 +1330,87 @@ function App() {
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2500);
+  };
+
+  // AUTHENTICATION: SEND OTP
+  const handleSendOtp = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const email = loginEmail.trim().toLowerCase();
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setLoginError("Masukkan alamat email yang valid.");
+      return;
+    }
+
+    setIsLoginLoading(true);
+    setLoginError("");
+
+    try {
+      const result = await sendLoginOtp(email);
+
+      setLoginMode(result.mode);
+      setLoginEmail(email);
+      setIsOtpSent(true);
+      setLoginOtp("");
+    } catch (error) {
+      console.error("Send OTP error:", error);
+
+      setLoginError(
+        error instanceof Error
+          ? error.message
+          : "Gagal mengirim kode verifikasi.",
+      );
+    } finally {
+      setIsLoginLoading(false);
+    }
+  };
+
+  // AUTHENTICATION: VERIFY OTP
+  const handleVerifyOtp = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!/^\d{8}$/.test(loginOtp.trim())) {
+      setLoginError("Masukkan kode OTP 8 digit.");
+      return;
+    }
+
+    setIsLoginLoading(true);
+    setLoginError("");
+
+    try {
+      await verifyLoginOtp(loginEmail, loginOtp, loginMode);
+
+      // Sesi sudah tersimpan oleh Supabase.
+      // Muat ulang agar proses inisialisasi cloud berjalan kembali.
+      window.location.reload();
+    } catch (error) {
+      console.error("Verify OTP error:", error);
+
+      setLoginError(
+        error instanceof Error ? error.message : "Kode verifikasi tidak valid.",
+      );
+    } finally {
+      setIsLoginLoading(false);
+    }
+  };
+
+  // AUTHENTICATION: BACK TO EMAIL
+  const handleBackToEmail = () => {
+    setIsOtpSent(false);
+    setLoginOtp("");
+    setLoginError("");
+  };
+
+  // AUTHENTICATION: LOGOUT
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      window.location.reload();
+    } catch (error) {
+      console.error("Logout error:", error);
+      notify("Gagal keluar dari akun.");
+    }
   };
 
   const openAddRecurring = () => {
@@ -3664,6 +3776,171 @@ function App() {
     .filter((movement) => movement.type === "withdrawal")
     .reduce((total, movement) => total + movement.amount, 0);
 
+  // AUTHENTICATION SCREEN
+  if (isAuthChecking) {
+    return (
+      <main className="auth-screen">
+        <div className="auth-loading">
+          <div className="auth-logo-mark">V</div>
+          <div className="auth-brand">VILTURE</div>
+          <div className="auth-brand-caption">FINANCE SYSTEM</div>
+          <div className="auth-spinner" />
+          <span>Initializing secure session...</span>
+        </div>
+      </main>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <main className="auth-screen">
+        <div className="auth-grid-pattern" />
+        <div className="auth-decoration auth-decoration-one" />
+        <div className="auth-decoration auth-decoration-two" />
+
+        <section className="auth-container">
+          <div className="auth-header">
+            <div className="auth-logo-mark">V</div>
+
+            <div className="auth-brand">VILTURE</div>
+            <div className="auth-brand-caption">PERSONAL FINANCE</div>
+          </div>
+
+          <div className="auth-card">
+            <div className="auth-card-index">
+              <span>SECURE ACCESS</span>
+              <span>01 / 01</span>
+            </div>
+
+            <div className="auth-card-line" />
+
+            {!isOtpSent ? (
+              <>
+                <div className="auth-heading">
+                  <span className="auth-eyebrow">WELCOME BACK</span>
+                  <h1>
+                    Manage your
+                    <br />
+                    financial world.
+                  </h1>
+                  <p>Sign in to access your personal financial workspace.</p>
+                </div>
+
+                <form onSubmit={handleSendOtp} className="auth-form">
+                  <label htmlFor="login-email">EMAIL ADDRESS</label>
+
+                  <input
+                    id="login-email"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={loginEmail}
+                    onChange={(event) => {
+                      setLoginEmail(event.target.value);
+                      setLoginError("");
+                    }}
+                    autoComplete="email"
+                    required
+                    disabled={isLoginLoading}
+                  />
+
+                  {loginError && <div className="auth-error">{loginError}</div>}
+
+                  <button
+                    type="submit"
+                    className="auth-submit"
+                    disabled={isLoginLoading}
+                  >
+                    {isLoginLoading ? (
+                      "SENDING CODE..."
+                    ) : (
+                      <>
+                        CONTINUE WITH EMAIL
+                        <span>→</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="auth-heading">
+                  <span className="auth-eyebrow">EMAIL VERIFICATION</span>
+                  <h1>
+                    Check your
+                    <br />
+                    inbox.
+                  </h1>
+                  <p>
+                    We've sent a verification code to
+                    <strong> {loginEmail}</strong>
+                  </p>
+                </div>
+
+                <form onSubmit={handleVerifyOtp} className="auth-form">
+                  <label htmlFor="login-otp">6-DIGIT VERIFICATION CODE</label>
+
+                  <input
+                    id="login-otp"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="00000000"
+                    maxLength={8}
+                    value={loginOtp}
+                    onChange={(event) => {
+                      setLoginOtp(
+                        event.target.value.replace(/\D/g, "").slice(0, 8),
+                      );
+                      setLoginError("");
+                    }}
+                    required
+                    disabled={isLoginLoading}
+                  />
+
+                  {loginError && <div className="auth-error">{loginError}</div>}
+
+                  <button
+                    type="submit"
+                    className="auth-submit"
+                    disabled={isLoginLoading || loginOtp.length !== 8}
+                  >
+                    {isLoginLoading ? (
+                      "VERIFYING..."
+                    ) : (
+                      <>
+                        VERIFY & CONTINUE
+                        <span>→</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="auth-back"
+                    onClick={handleBackToEmail}
+                    disabled={isLoginLoading}
+                  >
+                    ← CHANGE EMAIL ADDRESS
+                  </button>
+                </form>
+              </>
+            )}
+
+            <div className="auth-card-footer">
+              <span>ENCRYPTED CONNECTION</span>
+              <span>VILTURE / FINANCE</span>
+            </div>
+          </div>
+
+          <div className="auth-bottom">
+            <span>PERSONAL FINANCIAL MANAGEMENT</span>
+            <span>© 2026 VILTURE</span>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="phone-shell">
       <div className="app-screen">
@@ -3675,14 +3952,25 @@ function App() {
               <div className="brand-caption">FINANCE</div>
             </div>
           </div>
-          <button
-            className="icon-button notification-button"
-            aria-label="Notifications"
-            onClick={() => notify("Belum ada notifikasi")}
-          >
-            <Bell size={19} />
-            <span className="notification-dot" />
-          </button>
+          <div className="topbar-actions">
+            <button
+              className="icon-button notification-button"
+              aria-label="Notifications"
+              onClick={() => notify("Belum ada notifikasi")}
+            >
+              <Bell size={19} />
+              <span className="notification-dot" />
+            </button>
+
+            <button
+              className="icon-button logout-button"
+              aria-label="Logout"
+              title="Logout"
+              onClick={handleLogout}
+            >
+              <LogOut size={19} />
+            </button>
+          </div>
         </header>
         {activeTab === "Home" && (
           <div className="page-content">
