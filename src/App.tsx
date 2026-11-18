@@ -10,7 +10,6 @@ import {
   ImagePlus,
   Zap,
   ChevronRight,
-  ChevronLeft,
   CreditCard,
   Home,
   Target,
@@ -20,6 +19,8 @@ import {
   Pencil,
   Repeat,
   ScanLine,
+  Search,
+  SlidersHorizontal,
   UserRound,
   Wallet,
   X,
@@ -346,6 +347,9 @@ function App() {
   >("transactions");
 
   const [transferAccountFilter, setTransferAccountFilter] = useState("all");
+  const [activityAccountFilter, setActivityAccountFilter] = useState("all");
+  const [activitySearch, setActivitySearch] = useState("");
+  const [showActivityFilters, setShowActivityFilters] = useState(false);
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<
     "all" | "income" | "expense"
   >("all");
@@ -357,6 +361,33 @@ function App() {
     useState<Transaction | null>(null);
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
+  const filteredActivityTransactions = useMemo(() => {
+    const keyword = activitySearch.trim().toLowerCase();
+
+    return transactions
+      .filter((item) => {
+        const matchesAccount =
+          activityAccountFilter === "all" ||
+          item.accountId === activityAccountFilter;
+
+        const matchesType =
+          transactionTypeFilter === "all" ||
+          item.type === transactionTypeFilter;
+
+        const matchesSearch =
+          !keyword ||
+          item.title.toLowerCase().includes(keyword) ||
+          item.category.toLowerCase().includes(keyword);
+
+        return matchesAccount && matchesType && matchesSearch;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [
+    transactions,
+    activityAccountFilter,
+    transactionTypeFilter,
+    activitySearch,
+  ]);
 
   const [isDeletingTransaction, setIsDeletingTransaction] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
@@ -907,18 +938,33 @@ function App() {
     [transactions, selectedId],
   );
 
-  const filteredTransfers = useMemo(
-    () =>
-      transfers
-        .filter(
-          (item) =>
-            transferAccountFilter === "all" ||
-            item.fromAccountId === transferAccountFilter ||
-            item.toAccountId === transferAccountFilter,
-        )
-        .sort((a, b) => b.transferDate.localeCompare(a.transferDate)),
-    [transfers, transferAccountFilter],
-  );
+  const filteredTransfers = useMemo(() => {
+    const keyword = activitySearch.trim().toLowerCase();
+
+    return transfers
+      .filter((item) => {
+        const matchesAccount =
+          transferAccountFilter === "all" ||
+          item.fromAccountId === transferAccountFilter ||
+          item.toAccountId === transferAccountFilter;
+
+        const fromAccount = accounts.find(
+          (account) => account.id === item.fromAccountId,
+        );
+        const toAccount = accounts.find(
+          (account) => account.id === item.toAccountId,
+        );
+
+        const matchesSearch =
+          !keyword ||
+          item.description.toLowerCase().includes(keyword) ||
+          (fromAccount?.nickname ?? "").toLowerCase().includes(keyword) ||
+          (toAccount?.nickname ?? "").toLowerCase().includes(keyword);
+
+        return matchesAccount && matchesSearch;
+      })
+      .sort((a, b) => b.transferDate.localeCompare(a.transferDate));
+  }, [transfers, transferAccountFilter, activitySearch, accounts]);
 
   const selectedBank =
     accountOptions.find((item) => item.name === bank) ?? accountOptions[0];
@@ -4701,145 +4747,147 @@ function App() {
           })()}
 
         {activeTab === "Activity" && (
-          <div className="page-content secondary-page">
+          <div className="page-content secondary-page activity-page">
             <p className="eyebrow">MONEY MOVEMENT</p>
             <h1>Activity</h1>
-
             <p className="subheading">
-              {activityView === "transactions"
-                ? selectedAccount
-                  ? `Riwayat ${selectedAccount.nickname}`
-                  : "Pilih rekening untuk melihat riwayat."
-                : "Riwayat perpindahan saldo antar rekening."}
+              Riwayat transaksi dan perpindahan saldo.
             </p>
 
-            <div className="account-filter activity-view-switch">
-              <button
-                type="button"
-                className={
-                  activityView === "transactions" ? "filter-active" : ""
-                }
-                onClick={() => setActivityView("transactions")}
-              >
-                Transactions
-              </button>
+            <div className="activity-toolbar">
+              <div className="activity-view-switch">
+                <button
+                  type="button"
+                  className={
+                    activityView === "transactions" ? "filter-active" : ""
+                  }
+                  onClick={() => {
+                    setActivityView("transactions");
+                    setShowActivityFilters(false);
+                  }}
+                >
+                  Transaction
+                </button>
+
+                <button
+                  type="button"
+                  className={
+                    activityView === "transfers" ? "filter-active" : ""
+                  }
+                  onClick={() => {
+                    setActivityView("transfers");
+                    setShowActivityFilters(false);
+                  }}
+                >
+                  Transfer
+                </button>
+              </div>
+            </div>
+
+            <div className="activity-search-row">
+              <div className="activity-search-box">
+                <Search size={17} />
+                <input
+                  type="text"
+                  value={activitySearch}
+                  onChange={(event) => setActivitySearch(event.target.value)}
+                  placeholder={
+                    activityView === "transactions"
+                      ? "Search transactions..."
+                      : "Search transfers..."
+                  }
+                />
+                {activitySearch && (
+                  <button
+                    type="button"
+                    onClick={() => setActivitySearch("")}
+                    aria-label="Clear search"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
 
               <button
                 type="button"
-                className={activityView === "transfers" ? "filter-active" : ""}
-                onClick={() => setActivityView("transfers")}
+                className={`activity-filter-button ${showActivityFilters ? "filter-active" : ""}`}
+                onClick={() => setShowActivityFilters((current) => !current)}
+                aria-label="Open filters"
+                title="Filter"
               >
-                Transfers
+                <SlidersHorizontal size={18} />
               </button>
             </div>
 
-            {activityView === "transactions" ? (
-              <>
-                {accounts.length > 0 && (
-                  <>
-                    <div className="activity-account-switcher">
-                      <button
-                        type="button"
-                        className="activity-switch-arrow"
-                        aria-label="Rekening sebelumnya"
-                        onClick={() => {
-                          const currentIndex = accounts.findIndex(
-                            (account) => account.id === selectedId,
-                          );
-                          const previousIndex =
-                            currentIndex <= 0
-                              ? accounts.length - 1
-                              : currentIndex - 1;
+            {showActivityFilters && (
+              <div className="activity-filter-panel">
+                <div className="activity-filter-field">
+                  <label>Account</label>
+                  <select
+                    value={
+                      activityView === "transactions"
+                        ? activityAccountFilter
+                        : transferAccountFilter
+                    }
+                    onChange={(event) => {
+                      if (activityView === "transactions") {
+                        setActivityAccountFilter(event.target.value);
+                      } else {
+                        setTransferAccountFilter(event.target.value);
+                      }
+                    }}
+                  >
+                    <option value="all">All accounts</option>
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.nickname} · {account.bank}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                          setSelectedId(accounts[previousIndex].id);
-                        }}
-                      >
-                        <ChevronLeft size={20} />
-                      </button>
-
-                      {selectedAccount && (
-                        <div className="activity-account-card">
-                          <div
-                            className={`activity-card-brand ${getOption(selectedAccount.bank).style}`}
-                          >
-                            <span>{getOption(selectedAccount.bank).label}</span>
-                            <CreditCard size={20} />
-                          </div>
-
-                          <div className="activity-card-details">
-                            <div>
-                              <span>SELECTED ACCOUNT</span>
-                              <strong>{selectedAccount.nickname}</strong>
-                            </div>
-                            <div className="activity-card-balance">
-                              <span>AVAILABLE BALANCE</span>
-                              <strong>
-                                {rupiah(getAccountBalance(selectedAccount.id))}
-                              </strong>
-                            </div>
-                          </div>
-
-                          <div className="activity-card-footer">
-                            <span>
-                              •••• {selectedAccount.number.slice(-4) || "0000"}
-                            </span>
-                            <span>
-                              {accounts.findIndex(
-                                (item) => item.id === selectedId,
-                              ) + 1}
-                              {" / "}
-                              {accounts.length}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        className="activity-switch-arrow"
-                        aria-label="Rekening berikutnya"
-                        onClick={() => {
-                          const currentIndex = accounts.findIndex(
-                            (account) => account.id === selectedId,
-                          );
-                          const nextIndex =
-                            currentIndex >= accounts.length - 1
-                              ? 0
-                              : currentIndex + 1;
-
-                          setSelectedId(accounts[nextIndex].id);
-                        }}
-                      >
-                        <ChevronRight size={20} />
-                      </button>
-                    </div>
-
-                    <div className="activity-type-filter">
-                      {(["all", "income", "expense"] as const).map((filter) => (
-                        <button
-                          key={filter}
-                          type="button"
-                          className={
-                            transactionTypeFilter === filter
-                              ? "filter-active"
-                              : ""
-                          }
-                          onClick={() => setTransactionTypeFilter(filter)}
-                        >
-                          {filter === "all"
-                            ? "All transactions"
-                            : filter === "income"
-                              ? "Income"
-                              : "Expense"}
-                        </button>
-                      ))}
-                    </div>
-                  </>
+                {activityView === "transactions" && (
+                  <div className="activity-filter-field">
+                    <label>Type</label>
+                    <select
+                      value={transactionTypeFilter}
+                      onChange={(event) =>
+                        setTransactionTypeFilter(
+                          event.target.value as "all" | "income" | "expense",
+                        )
+                      }
+                    >
+                      <option value="all">All transactions</option>
+                      <option value="income">Income</option>
+                      <option value="expense">Expense</option>
+                    </select>
+                  </div>
                 )}
 
-                {selectedTransactions.length > 0 ? (
-                  <div className="transaction-list activity-full-list">
-                    {selectedTransactions.map((transaction) => (
+                <button
+                  type="button"
+                  className="activity-reset-filter"
+                  onClick={() => {
+                    setActivityAccountFilter("all");
+                    setTransferAccountFilter("all");
+                    setTransactionTypeFilter("all");
+                    setActivitySearch("");
+                  }}
+                >
+                  Reset filters
+                </button>
+              </div>
+            )}
+
+            {activityView === "transactions" ? (
+              filteredActivityTransactions.length > 0 ? (
+                <div className="transaction-list activity-full-list">
+                  {filteredActivityTransactions.map((transaction) => {
+                    const account = accounts.find(
+                      (item) => item.id === transaction.accountId,
+                    );
+
+                    return (
                       <div
                         className="transaction-item transaction-clickable"
                         key={transaction.id}
@@ -4858,6 +4906,9 @@ function App() {
                           <span>
                             {transaction.category} ·{" "}
                             {formatDate(transaction.date)}
+                          </span>
+                          <span className="activity-account-label">
+                            {account?.nickname ?? "Unknown account"}
                           </span>
                         </div>
 
@@ -4892,205 +4943,95 @@ function App() {
                           </button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="large-empty">
-                    <Activity size={30} />
-                    <strong>Belum ada transaksi</strong>
-                    <span>
-                      Riwayat transaksi rekening terpilih akan muncul di sini.
-                    </span>
-
-                    {selectedAccount && (
-                      <button
-                        className="primary-button"
-                        onClick={() => setShowTransactionModal(true)}
-                      >
-                        <Plus size={16} /> Add transaction
-                      </button>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="activity-account-switcher transfer-account-switcher">
-                  <button
-                    type="button"
-                    className="activity-switch-arrow"
-                    aria-label="Filter rekening sebelumnya"
-                    onClick={() => {
-                      const currentIndex = accounts.findIndex(
-                        (account) => account.id === transferAccountFilter,
-                      );
-                      const previousIndex =
-                        transferAccountFilter === "all"
-                          ? accounts.length - 1
-                          : currentIndex <= 0
-                            ? -1
-                            : currentIndex - 1;
-
-                      setTransferAccountFilter(
-                        previousIndex === -1
-                          ? "all"
-                          : accounts[previousIndex].id,
-                      );
-                    }}
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-
-                  <div className="activity-account-card transfer-account-card">
-                    {transferAccountFilter === "all" ? (
-                      <>
-                        <div className="activity-card-brand all-accounts-brand">
-                          <span>ALL ACCOUNTS</span>
-                          <Wallet size={20} />
-                        </div>
-                        <div className="activity-card-details">
-                          <div>
-                            <span>TRANSFER HISTORY</span>
-                            <strong>All accounts</strong>
-                          </div>
-                          <div className="activity-card-balance">
-                            <span>CONNECTED ACCOUNTS</span>
-                            <strong>{accounts.length} accounts</strong>
-                          </div>
-                        </div>
-                        <div className="activity-card-footer">
-                          <span>Incoming & outgoing transfers</span>
-                          <span>ALL</span>
-                        </div>
-                      </>
-                    ) : (
-                      (() => {
-                        const account = accounts.find(
-                          (item) => item.id === transferAccountFilter,
-                        );
-
-                        if (!account) return null;
-
-                        return (
-                          <>
-                            <div
-                              className={`activity-card-brand ${getOption(account.bank).style}`}
-                            >
-                              <span>{getOption(account.bank).label}</span>
-                              <CreditCard size={20} />
-                            </div>
-                            <div className="activity-card-details">
-                              <div>
-                                <span>TRANSFER HISTORY</span>
-                                <strong>{account.nickname}</strong>
-                              </div>
-                              <div className="activity-card-balance">
-                                <span>AVAILABLE BALANCE</span>
-                                <strong>
-                                  {rupiah(getAccountBalance(account.id))}
-                                </strong>
-                              </div>
-                            </div>
-                            <div className="activity-card-footer">
-                              <span>
-                                •••• {account.number.slice(-4) || "0000"}
-                              </span>
-                              <span>
-                                {accounts.findIndex(
-                                  (item) => item.id === account.id,
-                                ) + 1}
-                                {" / "}
-                                {accounts.length}
-                              </span>
-                            </div>
-                          </>
-                        );
-                      })()
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    className="activity-switch-arrow"
-                    aria-label="Filter rekening berikutnya"
-                    onClick={() => {
-                      const currentIndex = accounts.findIndex(
-                        (account) => account.id === transferAccountFilter,
-                      );
-                      const nextIndex =
-                        transferAccountFilter === "all"
-                          ? 0
-                          : currentIndex >= accounts.length - 1
-                            ? -1
-                            : currentIndex + 1;
-
-                      setTransferAccountFilter(
-                        nextIndex === -1 ? "all" : accounts[nextIndex].id,
-                      );
-                    }}
-                  >
-                    <ChevronRight size={20} />
-                  </button>
+                    );
+                  })}
                 </div>
+              ) : (
+                <div className="large-empty">
+                  <Activity size={30} />
+                  <strong>
+                    {activitySearch ||
+                    activityAccountFilter !== "all" ||
+                    transactionTypeFilter !== "all"
+                      ? "No matching transactions"
+                      : "No transactions yet"}
+                  </strong>
+                  <span>
+                    {activitySearch ||
+                    activityAccountFilter !== "all" ||
+                    transactionTypeFilter !== "all"
+                      ? "Try changing your search or filters."
+                      : "Your transaction history will appear here."}
+                  </span>
 
-                {filteredTransfers.length > 0 ? (
-                  <div className="transaction-list activity-full-list">
-                    {filteredTransfers.map((item) => {
-                      const fromAccount = accounts.find(
-                        (account) => account.id === item.fromAccountId,
-                      );
+                  {accounts.length > 0 && (
+                    <button
+                      className="primary-button"
+                      onClick={() => setShowTransactionModal(true)}
+                    >
+                      <Plus size={16} /> Add transaction
+                    </button>
+                  )}
+                </div>
+              )
+            ) : filteredTransfers.length > 0 ? (
+              <div className="transaction-list activity-full-list">
+                {filteredTransfers.map((item) => {
+                  const fromAccount = accounts.find(
+                    (account) => account.id === item.fromAccountId,
+                  );
 
-                      const toAccount = accounts.find(
-                        (account) => account.id === item.toAccountId,
-                      );
+                  const toAccount = accounts.find(
+                    (account) => account.id === item.toAccountId,
+                  );
 
-                      return (
-                        <div
-                          className="transaction-item transfer-history-item"
-                          key={item.id}
-                        >
-                          <div className="transaction-icon transfer">
-                            <ArrowDownUp size={19} />
-                          </div>
+                  return (
+                    <div
+                      className="transaction-item transfer-history-item"
+                      key={item.id}
+                    >
+                      <div className="transaction-icon transfer">
+                        <ArrowDownUp size={19} />
+                      </div>
 
-                          <div className="transaction-copy">
-                            <strong>
-                              {item.description || "Transfer antar rekening"}
-                            </strong>
-                            <span>
-                              {fromAccount?.nickname ?? "Rekening asal"}
-                              {" → "}
-                              {toAccount?.nickname ?? "Rekening tujuan"}
-                            </span>
-                            <span>{formatDate(item.transferDate)}</span>
-                          </div>
+                      <div className="transaction-copy">
+                        <strong>
+                          {item.description || "Transfer antar rekening"}
+                        </strong>
+                        <span>
+                          {fromAccount?.nickname ?? "Rekening asal"}
+                          {" → "}
+                          {toAccount?.nickname ?? "Rekening tujuan"}
+                        </span>
+                        <span>{formatDate(item.transferDate)}</span>
+                      </div>
 
-                          <strong className="transaction-amount transfer">
-                            {rupiah(item.amount)}
-                          </strong>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="large-empty">
-                    <ArrowDownUp size={30} />
-                    <strong>Belum ada transfer</strong>
-                    <span>
-                      Riwayat transfer antar rekening akan muncul di sini.
-                    </span>
+                      <strong className="transaction-amount transfer">
+                        {rupiah(item.amount)}
+                      </strong>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="large-empty">
+                <ArrowDownUp size={30} />
+                <strong>
+                  {activitySearch || transferAccountFilter !== "all"
+                    ? "No matching transfers"
+                    : "No transfers yet"}
+                </strong>
+                <span>Your transfer history will appear here.</span>
 
-                    {accounts.length >= 2 && (
-                      <button
-                        className="primary-button"
-                        onClick={openTransferModal}
-                      >
-                        <ArrowDownUp size={16} /> New transfer
-                      </button>
-                    )}
-                  </div>
+                {accounts.length >= 2 && (
+                  <button
+                    className="primary-button"
+                    onClick={openTransferModal}
+                  >
+                    <ArrowDownUp size={16} /> New transfer
+                  </button>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
