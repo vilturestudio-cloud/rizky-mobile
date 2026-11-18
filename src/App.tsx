@@ -330,7 +330,7 @@ function App() {
   type GoldPriceHistory = {
     id: string;
     sell_price: number;
-    buyback_price: number;
+    buyback_price: number | null;
     source_updated_at: string | null;
     recorded_at: string;
   };
@@ -340,7 +340,7 @@ function App() {
   );
 
   const [goldChartPeriod, setGoldChartPeriod] = useState<
-    "1D" | "1W" | "1M" | "3M" | "1Y"
+    "1D" | "1W" | "1M" | "3M" | "1Y" | "ALL"
   >("1W");
 
   const filteredGoldHistory = useMemo(() => {
@@ -363,17 +363,25 @@ function App() {
       case "1Y":
         start.setFullYear(start.getFullYear() - 1);
         break;
+      case "ALL":
+        start.setTime(0);
+        break;
     }
 
     return goldPriceHistory
       .filter((item) => new Date(item.recorded_at) >= start)
       .map((item) => ({
         ...item,
-        chartTime: new Date(item.recorded_at).toLocaleString("id-ID", {
+        chartTime: new Date(item.recorded_at).toLocaleDateString("id-ID", {
           day: "2-digit",
           month: "short",
-          hour: goldChartPeriod === "1D" ? "2-digit" : undefined,
-          minute: goldChartPeriod === "1D" ? "2-digit" : undefined,
+          year: goldChartPeriod === "ALL" ? "numeric" : undefined,
+          ...(goldChartPeriod === "1D"
+            ? {
+                hour: "2-digit",
+                minute: "2-digit",
+              }
+            : {}),
         }),
       }));
   }, [goldPriceHistory, goldChartPeriod]);
@@ -384,16 +392,33 @@ function App() {
     setIsGoldHistoryLoading(true);
 
     try {
-      const { data, error } = await supabase
-        .from("gold_price_history")
-        .select("id, sell_price, buyback_price, source_updated_at, recorded_at")
-        .eq("source", "ANTAM")
-        .eq("weight", 1)
-        .order("recorded_at", { ascending: true });
+      const pageSize = 1000;
+      let offset = 0;
+      let allHistory: GoldPriceHistory[] = [];
 
-      if (error) throw error;
+      while (true) {
+        const { data, error } = await supabase
+          .from("gold_price_history")
+          .select(
+            "id, sell_price, buyback_price, source_updated_at, recorded_at",
+          )
+          .eq("source", "ANTAM")
+          .eq("weight", 1)
+          .order("recorded_at", { ascending: true })
+          .range(offset, offset + pageSize - 1);
 
-      setGoldPriceHistory(data ?? []);
+        if (error) throw error;
+
+        const records = (data ?? []) as GoldPriceHistory[];
+
+        allHistory = [...allHistory, ...records];
+
+        if (records.length < pageSize) break;
+
+        offset += pageSize;
+      }
+
+      setGoldPriceHistory(allHistory);
     } catch (error) {
       console.error("Gold history error:", error);
     } finally {
@@ -5541,16 +5566,18 @@ function App() {
               </div>
 
               <div className="gold-chart-periods">
-                {(["1D", "1W", "1M", "3M", "1Y"] as const).map((period) => (
-                  <button
-                    key={period}
-                    type="button"
-                    className={goldChartPeriod === period ? "active" : ""}
-                    onClick={() => setGoldChartPeriod(period)}
-                  >
-                    {period}
-                  </button>
-                ))}
+                {(["1D", "1W", "1M", "3M", "1Y", "ALL"] as const).map(
+                  (period) => (
+                    <button
+                      key={period}
+                      type="button"
+                      className={goldChartPeriod === period ? "active" : ""}
+                      onClick={() => setGoldChartPeriod(period)}
+                    >
+                      {period}
+                    </button>
+                  ),
+                )}
               </div>
 
               {isGoldHistoryLoading ? (
