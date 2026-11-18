@@ -4796,3 +4796,149 @@ button:disabled {
 .transaction-shortcuts button:nth-child(-n + 3) {
   border-bottom: 1px solid var(--vf-line);
 }
+
+/* =========================================
+   SAVINGS POCKET — CREATE MODAL
+========================================= */
+
+.savings-pocket-modal {
+  width: min(440px, calc(100vw - 32px)) !important;
+  max-width: 440px !important;
+  padding: 26px !important;
+  box-sizing: border-box;
+  background: #10151b !important;
+  border: 1px solid #303b45 !important;
+  border-radius: 2px !important;
+  color: #f1f5f7;
+}
+
+/* Modal header */
+.savings-pocket-modal .modal-heading {
+  margin-bottom: 24px;
+  align-items: flex-start;
+}
+
+.savings-pocket-modal .modal-heading h2 {
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  margin-top: 6px;
+}
+
+.savings-pocket-modal .eyebrow {
+  color: #35d6c4;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+}
+
+/* Form layout */
+.savings-pocket-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.savings-pocket-modal form label {
+  color: #89949e;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+/* Input & textarea */
+.savings-pocket-modal form input,
+.savings-pocket-modal form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  background: #090d11;
+  border: 1px solid #34414b;
+  border-radius: 0;
+  color: #e8edef;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.savings-pocket-modal form input {
+  min-height: 44px;
+}
+
+.savings-pocket-modal form textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.savings-pocket-modal form input:focus,
+.savings-pocket-modal form textarea:focus {
+  border-color: #35d6c4;
+}
+
+.savings-pocket-modal form input::placeholder,
+.savings-pocket-modal form textarea::placeholder {
+  color: #64717c;
+}
+
+/* Pocket preview */
+.savings-pocket-modal .modal-preview {
+  margin-top: 8px;
+  margin-bottom: 12px;
+  padding: 14px;
+  background: #090d11;
+  border: 1px solid #303b45;
+  border-radius: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.savings-pocket-modal .modal-preview span {
+  font-size: 10px;
+  color: #82909b;
+}
+
+.savings-pocket-modal .modal-preview strong {
+  color: #35d6c4;
+  font-size: 11px;
+  text-align: right;
+}
+
+/* Submit button */
+.savings-pocket-modal .full-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 8px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+/* Close button */
+.savings-pocket-modal .icon-button {
+  border: 1px solid #34414b;
+  border-radius: 0;
+  background: transparent;
+  color: #aab5bd;
+  width: 34px;
+  height: 34px;
+}
+
+.savings-pocket-modal .icon-button:hover {
+  border-color: #35d6c4;
+  color: #35d6c4;
+}
+
+/* Mobile adjustment */
+@media (max-width: 480px) {
+  .savings-pocket-modal {
+    width: calc(100vw - 28px) !important;
+    padding: 20px !important;
+  }
+
+  .savings-pocket-modal .modal-heading h2 {
+    font-size: 20px;
+  }
+}

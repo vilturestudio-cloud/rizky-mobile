@@ -5699,7 +5699,7 @@ function App() {
       {showSavingsMovementModal && selectedSavingsPocket && (
         <div className="modal-backdrop" onClick={closeSavingsMovementModal}>
           <div
-            className="account-modal"
+            className="account-modal savings-movement-modal"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-heading">
@@ -5789,7 +5789,7 @@ function App() {
       {showSavingsPocketModal && (
         <div className="modal-backdrop" onClick={closeSavingsPocketModal}>
           <div
-            className="account-modal"
+            className="account-modal savings-pocket-modal"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-heading">
