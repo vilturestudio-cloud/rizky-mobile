@@ -118,6 +118,22 @@ type GoalContribution = {
   contributedAt: string;
 };
 
+type SavingsPocket = {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+};
+
+type SavingsMovement = {
+  id: string;
+  pocketId: string;
+  type: "deposit" | "withdrawal";
+  amount: number;
+  note: string;
+  movementDate: string;
+};
+
 type Budget = {
   id: string;
   accountId: string;
@@ -233,6 +249,29 @@ function App() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [savingsPockets, setSavingsPockets] = useState<SavingsPocket[]>([]);
+  const [savingsMovements, setSavingsMovements] = useState<SavingsMovement[]>(
+    [],
+  );
+  const [selectedSavingsPocketId, setSelectedSavingsPocketId] = useState<
+    string | null
+  >(null);
+
+  const [showSavingsPocketModal, setShowSavingsPocketModal] = useState(false);
+  const [savingsPocketName, setSavingsPocketName] = useState("");
+  const [savingsPocketDescription, setSavingsPocketDescription] = useState("");
+  const [isSavingSavingsPocket, setIsSavingSavingsPocket] = useState(false);
+  const [showSavingsMovementModal, setShowSavingsMovementModal] =
+    useState(false);
+  const [savingsMovementType, setSavingsMovementType] = useState<
+    "deposit" | "withdrawal"
+  >("deposit");
+  const [savingsMovementAmount, setSavingsMovementAmount] = useState("");
+  const [savingsMovementNote, setSavingsMovementNote] = useState("");
+  const [savingsMovementDate, setSavingsMovementDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [isSavingSavingsMovement, setIsSavingSavingsMovement] = useState(false);
   const [budgets, setBudgets] = useState<Budget[]>([]);
 
   const [recurringTransactions, setRecurringTransactions] = useState<
@@ -445,6 +484,8 @@ function App() {
           transactionsResult,
           categoriesResult,
           savingsGoalsResult,
+          savingsPocketsResult,
+          savingsMovementsResult,
           contributionsResult,
           budgetsResult,
         ] = await Promise.all([
@@ -458,6 +499,17 @@ function App() {
             .select("*")
             .eq("user_id", uid)
             .order("budget_month", { ascending: false }),
+          supabase
+            .from("savings_pockets")
+            .select("*")
+            .eq("user_id", uid)
+            .order("created_at", { ascending: false }),
+
+          supabase
+            .from("savings_movements")
+            .select("*")
+            .eq("user_id", uid)
+            .order("movement_date", { ascending: false }),
         ]);
 
         if (accountsResult.error) throw accountsResult.error;
@@ -466,6 +518,8 @@ function App() {
         if (savingsGoalsResult.error) throw savingsGoalsResult.error;
         if (contributionsResult.error) throw contributionsResult.error;
         if (budgetsResult.error) throw budgetsResult.error;
+        if (savingsPocketsResult.error) throw savingsPocketsResult.error;
+        if (savingsMovementsResult.error) throw savingsMovementsResult.error;
 
         let cloudAccounts = accountsResult.data ?? [];
         let cloudTransactions = transactionsResult.data ?? [];
@@ -644,6 +698,25 @@ function App() {
             amount: Number(item.amount),
             note: item.note ?? "",
             contributedAt: item.contributed_at,
+          })),
+        );
+        setSavingsPockets(
+          (savingsPocketsResult.data ?? []).map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            description: item.description ?? "",
+            createdAt: item.created_at,
+          })),
+        );
+
+        setSavingsMovements(
+          (savingsMovementsResult.data ?? []).map((item: any) => ({
+            id: item.id,
+            pocketId: item.pocket_id,
+            type: item.type,
+            amount: Number(item.amount),
+            note: item.note ?? "",
+            movementDate: item.movement_date,
           })),
         );
 
@@ -1541,6 +1614,149 @@ function App() {
       notify("Gagal menghapus savings goal");
     } finally {
       setIsDeletingGoal(false);
+    }
+  };
+
+  const closeSavingsPocketModal = () => {
+    if (isSavingSavingsPocket) return;
+
+    setShowSavingsPocketModal(false);
+    setSavingsPocketName("");
+    setSavingsPocketDescription("");
+  };
+
+  const createSavingsPocket = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const name = savingsPocketName.trim();
+    const description = savingsPocketDescription.trim();
+
+    if (!name) {
+      notify("Nama savings pocket wajib diisi");
+      return;
+    }
+
+    if (!isCloudReady || !userId) {
+      notify("Koneksi cloud belum siap");
+      return;
+    }
+
+    setIsSavingSavingsPocket(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("savings_pockets")
+        .insert({
+          user_id: userId,
+          name,
+          description,
+        })
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      const newPocket: SavingsPocket = {
+        id: data.id,
+        name: data.name,
+        description: data.description ?? "",
+        createdAt: data.created_at,
+      };
+
+      setSavingsPockets((current) => [...current, newPocket]);
+
+      setShowSavingsPocketModal(false);
+      setSavingsPocketName("");
+      setSavingsPocketDescription("");
+
+      notify("Savings pocket berhasil dibuat");
+    } catch (error) {
+      console.error("Create savings pocket error:", error);
+      notify("Savings pocket gagal dibuat");
+    } finally {
+      setIsSavingSavingsPocket(false);
+    }
+  };
+
+  const closeSavingsMovementModal = () => {
+    if (isSavingSavingsMovement) return;
+
+    setShowSavingsMovementModal(false);
+    setSavingsMovementAmount("");
+    setSavingsMovementNote("");
+    setSavingsMovementDate(new Date().toISOString().slice(0, 10));
+  };
+
+  const createSavingsMovement = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!selectedSavingsPocket || !userId || !isCloudReady) {
+      notify("Savings pocket atau koneksi cloud tidak tersedia");
+      return;
+    }
+
+    const amount = Number(savingsMovementAmount);
+    const currentBalance = getSavingsPocketBalance(selectedSavingsPocket.id);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      notify("Nominal harus lebih dari 0");
+      return;
+    }
+
+    if (savingsMovementType === "withdrawal" && amount > currentBalance) {
+      notify("Saldo savings pocket tidak mencukupi");
+      return;
+    }
+
+    if (!savingsMovementDate) {
+      notify("Tanggal transaksi wajib diisi");
+      return;
+    }
+
+    setIsSavingSavingsMovement(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("savings_movements")
+        .insert({
+          user_id: userId,
+          pocket_id: selectedSavingsPocket.id,
+          type: savingsMovementType,
+          amount,
+          note: savingsMovementNote.trim(),
+          movement_date: savingsMovementDate,
+        })
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      const newMovement: SavingsMovement = {
+        id: data.id,
+        pocketId: data.pocket_id,
+        type: data.type,
+        amount: Number(data.amount),
+        note: data.note ?? "",
+        movementDate: data.movement_date,
+      };
+
+      setSavingsMovements((current) => [newMovement, ...current]);
+
+      setShowSavingsMovementModal(false);
+      setSavingsMovementAmount("");
+      setSavingsMovementNote("");
+      setSavingsMovementDate(new Date().toISOString().slice(0, 10));
+
+      notify(
+        savingsMovementType === "deposit"
+          ? "Deposit berhasil disimpan"
+          : "Withdrawal berhasil disimpan",
+      );
+    } catch (error) {
+      console.error("Create savings movement error:", error);
+      notify("Transaksi gagal disimpan");
+    } finally {
+      setIsSavingSavingsMovement(false);
     }
   };
 
@@ -3103,6 +3319,40 @@ function App() {
     swipeStartX.current = null;
   };
 
+  const getSavingsPocketBalance = (pocketId: string) => {
+    return savingsMovements
+      .filter((movement) => movement.pocketId === pocketId)
+      .reduce((balance, movement) => {
+        return movement.type === "deposit"
+          ? balance + movement.amount
+          : balance - movement.amount;
+      }, 0);
+  };
+
+  const selectedSavingsPocket = savingsPockets.find(
+    (pocket) => pocket.id === selectedSavingsPocketId,
+  );
+
+  const selectedPocketMovements = savingsMovements
+    .filter((movement) => movement.pocketId === selectedSavingsPocketId)
+    .sort(
+      (a, b) =>
+        new Date(b.movementDate).getTime() - new Date(a.movementDate).getTime(),
+    );
+
+  const totalSavingsBalance = savingsPockets.reduce(
+    (total, pocket) => total + getSavingsPocketBalance(pocket.id),
+    0,
+  );
+
+  const totalSavingsDeposits = savingsMovements
+    .filter((movement) => movement.type === "deposit")
+    .reduce((total, movement) => total + movement.amount, 0);
+
+  const totalSavingsWithdrawals = savingsMovements
+    .filter((movement) => movement.type === "withdrawal")
+    .reduce((total, movement) => total + movement.amount, 0);
+
   return (
     <main className="phone-shell">
       <div className="app-screen">
@@ -3357,18 +3607,18 @@ function App() {
                 <span>Income</span>
               </button>
 
-              <button onClick={() => setActiveTab("Savings")}>
+              <button onClick={() => setActiveTab("SavingsPockets")}>
                 <span className="shortcut-icon savings-shortcut">
                   <Wallet size={21} />
                 </span>
                 <span>Savings</span>
               </button>
 
-              <button onClick={openAddGoal}>
+              <button onClick={() => setActiveTab("Cards")}>
                 <span className="shortcut-icon">
-                  <Target size={21} />
+                  <CreditCard size={21} />
                 </span>
-                <span>Goal</span>
+                <span>Cards</span>
               </button>
 
               <button onClick={() => setActiveTab("Budget")}>
@@ -3922,8 +4172,10 @@ function App() {
         {activeTab === "Savings" && (
           <div className="page-content secondary-page savings-page">
             <p className="eyebrow">PERSONAL FINANCE</p>
-            <h1>Savings</h1>
-            <p className="subheading">Pantau dan kelola seluruh tabunganmu.</p>
+            <h1>Goals</h1>
+            <p className="subheading">
+              Pantau dan kelola seluruh target tabunganmu.
+            </p>
 
             {/* SAVINGS OVERVIEW */}
             <div className="savings-overview">
@@ -4140,6 +4392,203 @@ function App() {
           </div>
         )}
 
+        {activeTab === "SavingsPocketDetail" && selectedSavingsPocket && (
+          <section className="page-section">
+            <button
+              className="text-button"
+              onClick={() => setActiveTab("SavingsPockets")}
+            >
+              ← Back to savings
+            </button>
+
+            <div className="section-header">
+              <div>
+                <p className="eyebrow">SAVINGS POCKET</p>
+                <h1>{selectedSavingsPocket.name}</h1>
+                {selectedSavingsPocket.description && (
+                  <p>{selectedSavingsPocket.description}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="balance-card">
+              <p>Available balance</p>
+              <h2>
+                {rupiah(getSavingsPocketBalance(selectedSavingsPocket.id))}
+              </h2>
+
+              <div className="action-row">
+                <button
+                  className="primary-button"
+                  onClick={() => {
+                    setSavingsMovementType("deposit");
+                    setShowSavingsMovementModal(true);
+                  }}
+                >
+                  + Deposit
+                </button>
+
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    setSavingsMovementType("withdrawal");
+                    setShowSavingsMovementModal(true);
+                  }}
+                >
+                  Withdraw
+                </button>
+              </div>
+            </div>
+
+            <div className="section-header">
+              <div>
+                <p className="eyebrow">ACTIVITY</p>
+                <h2>Movement history</h2>
+              </div>
+              <span>{selectedPocketMovements.length} transactions</span>
+            </div>
+
+            {selectedPocketMovements.length === 0 ? (
+              <div className="empty-state">
+                <h3>No movements yet</h3>
+                <p>Your deposits and withdrawals will appear here.</p>
+              </div>
+            ) : (
+              <div className="activity-list">
+                {selectedPocketMovements.map((movement) => (
+                  <div key={movement.id} className="activity-item">
+                    <div className="activity-info">
+                      <strong>
+                        {movement.type === "deposit" ? "Deposit" : "Withdrawal"}
+                      </strong>
+                      <span>{movement.note || "Savings movement"}</span>
+                      <small>{movement.movementDate}</small>
+                    </div>
+
+                    <strong
+                      className={
+                        movement.type === "deposit"
+                          ? "income-text"
+                          : "expense-text"
+                      }
+                    >
+                      {movement.type === "deposit" ? "+" : "-"}
+                      {rupiah(movement.amount)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeTab === "SavingsPockets" && (
+          <div className="page-content secondary-page savings-page">
+            <p className="eyebrow">PERSONAL FINANCE</p>
+            <h1>Savings</h1>
+            <p className="subheading">
+              Kelola tabunganmu dalam beberapa pocket yang terorganisir.
+            </p>
+
+            {/* TOTAL SAVINGS */}
+            <div className="savings-overview">
+              <div className="savings-total-card">
+                <span>Total savings balance</span>
+                <strong>{rupiah(totalSavingsBalance)}</strong>
+                <small>Across {savingsPockets.length} savings pockets</small>
+              </div>
+
+              <div className="savings-stat-grid">
+                <div className="savings-stat-card">
+                  <span>Total deposits</span>
+                  <strong>{rupiah(totalSavingsDeposits)}</strong>
+                </div>
+
+                <div className="savings-stat-card">
+                  <span>Total withdrawals</span>
+                  <strong>{rupiah(totalSavingsWithdrawals)}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* POCKET LIST */}
+            <section className="section-block savings-goals-section">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">YOUR MONEY</p>
+                  <h2>My savings pockets</h2>
+                </div>
+
+                <button
+                  className="text-action"
+                  onClick={() => setShowSavingsPocketModal(true)}
+                >
+                  <Plus size={15} /> Create pocket
+                </button>
+              </div>
+
+              {savingsPockets.length > 0 ? (
+                <div className="savings-goal-list">
+                  {savingsPockets.map((pocket) => {
+                    const balance = getSavingsPocketBalance(pocket.id);
+
+                    return (
+                      <div
+                        className="savings-goal-item"
+                        key={pocket.id}
+                        onClick={() => {
+                          setSelectedSavingsPocketId(pocket.id);
+                          setActiveTab("SavingsPocketDetail");
+                        }}
+                      >
+                        <div className="goal-item-heading">
+                          <div>
+                            <strong>{pocket.name}</strong>
+                            <span>
+                              {pocket.description || "Personal savings pocket"}
+                            </span>
+                          </div>
+
+                          <strong>{rupiah(balance)}</strong>
+                        </div>
+
+                        <div className="goal-item-footer">
+                          <span>
+                            {
+                              savingsMovements.filter(
+                                (movement) => movement.pocketId === pocket.id,
+                              ).length
+                            }{" "}
+                            movements
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="empty-activity">
+                  <div className="activity-empty-icon">
+                    <Wallet size={21} />
+                  </div>
+
+                  <strong>Belum ada savings pocket</strong>
+                  <span>
+                    Buat pocket pertama untuk mulai memisahkan tabunganmu.
+                  </span>
+
+                  <button
+                    className="small-action"
+                    onClick={() => setShowSavingsPocketModal(true)}
+                  >
+                    <Plus size={14} /> Create your first pocket
+                  </button>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
         {activeTab === "SavingsDetail" &&
           (() => {
             const goal = savingsGoals.find(
@@ -4153,7 +4602,7 @@ function App() {
                     className="text-action"
                     onClick={() => setActiveTab("Savings")}
                   >
-                    ← Back to Savings
+                    ← Back to Goals
                   </button>
                   <h2>Goal tidak ditemukan</h2>
                 </div>
@@ -4184,7 +4633,7 @@ function App() {
                   className="text-action"
                   onClick={() => setActiveTab("Savings")}
                 >
-                  ← Back to Savings
+                  ← Back to Goals
                 </button>
 
                 <p className="eyebrow">SAVINGS / GOAL DETAIL</p>
@@ -5219,11 +5668,11 @@ function App() {
             <span>Home</span>
           </button>
           <button
-            className={activeTab === "Cards" ? "nav-active" : ""}
-            onClick={() => handleTab("Cards")}
+            className={activeTab === "Savings" ? "nav-active" : ""}
+            onClick={() => handleTab("Savings")}
           >
-            <CreditCard size={20} />
-            <span>Cards</span>
+            <Target size={20} />
+            <span>Goals</span>
           </button>
           <button className="scan-nav-button" onClick={() => handleTab("Scan")}>
             <span>
@@ -5247,6 +5696,161 @@ function App() {
           </button>
         </nav>
       </div>
+      {showSavingsMovementModal && selectedSavingsPocket && (
+        <div className="modal-backdrop" onClick={closeSavingsMovementModal}>
+          <div
+            className="account-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">SAVINGS MOVEMENT</p>
+                <h2>
+                  {savingsMovementType === "deposit" ? "Deposit" : "Withdraw"}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closeSavingsMovementModal}
+                disabled={isSavingSavingsMovement}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-preview">
+              <span>Selected pocket</span>
+              <strong>{selectedSavingsPocket.name}</strong>
+              <span>
+                Available balance:{" "}
+                {rupiah(getSavingsPocketBalance(selectedSavingsPocket.id))}
+              </span>
+            </div>
+
+            <form onSubmit={createSavingsMovement}>
+              <label htmlFor="savings-movement-amount">Amount (Rp)</label>
+
+              <input
+                id="savings-movement-amount"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                step="1"
+                value={savingsMovementAmount}
+                onChange={(event) =>
+                  setSavingsMovementAmount(event.target.value)
+                }
+                placeholder="0"
+                required
+              />
+
+              <label htmlFor="savings-movement-date">Transaction date</label>
+
+              <input
+                id="savings-movement-date"
+                type="date"
+                value={savingsMovementDate}
+                onChange={(event) => setSavingsMovementDate(event.target.value)}
+                required
+              />
+
+              <label htmlFor="savings-movement-note">Note (optional)</label>
+
+              <textarea
+                id="savings-movement-note"
+                value={savingsMovementNote}
+                onChange={(event) => setSavingsMovementNote(event.target.value)}
+                placeholder={
+                  savingsMovementType === "deposit"
+                    ? "Contoh: Transfer gaji"
+                    : "Contoh: Keperluan mendadak"
+                }
+                rows={3}
+                maxLength={120}
+              />
+
+              <button
+                className="primary-button full-button"
+                type="submit"
+                disabled={isSavingSavingsMovement}
+              >
+                {isSavingSavingsMovement
+                  ? "Saving transaction..."
+                  : savingsMovementType === "deposit"
+                    ? "Confirm deposit"
+                    : "Confirm withdrawal"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {showSavingsPocketModal && (
+        <div className="modal-backdrop" onClick={closeSavingsPocketModal}>
+          <div
+            className="account-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">SAVINGS</p>
+                <h2>Create pocket</h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closeSavingsPocketModal}
+                disabled={isSavingSavingsPocket}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={createSavingsPocket}>
+              <label htmlFor="savings-pocket-name">Pocket name</label>
+
+              <input
+                id="savings-pocket-name"
+                value={savingsPocketName}
+                onChange={(event) => setSavingsPocketName(event.target.value)}
+                placeholder="Contoh: Emergency fund"
+                maxLength={40}
+                required
+              />
+
+              <label htmlFor="savings-pocket-description">Description</label>
+
+              <textarea
+                id="savings-pocket-description"
+                value={savingsPocketDescription}
+                onChange={(event) =>
+                  setSavingsPocketDescription(event.target.value)
+                }
+                placeholder="Untuk apa tabungan ini?"
+                rows={3}
+                maxLength={120}
+              />
+
+              <div className="modal-preview">
+                <span>New savings pocket</span>
+                <strong>
+                  {savingsPocketName.trim() || "Your pocket name"}
+                </strong>
+              </div>
+
+              <button
+                className="primary-button full-button"
+                type="submit"
+                disabled={isSavingSavingsPocket}
+              >
+                {isSavingSavingsPocket ? "Creating pocket..." : "Create pocket"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
       {showAccountModal && (
         <div className="modal-backdrop" onClick={closeAccountModal}>
           <div

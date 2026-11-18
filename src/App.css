@@ -4787,3 +4787,12 @@ button:disabled {
     grid-column: auto;
   }
 }
+
+.transaction-shortcuts button:nth-child(3n + 1),
+.transaction-shortcuts button:nth-child(3n + 2) {
+  border-right: 1px solid var(--vf-line);
+}
+
+.transaction-shortcuts button:nth-child(-n + 3) {
+  border-bottom: 1px solid var(--vf-line);
+}
