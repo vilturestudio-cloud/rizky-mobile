@@ -4942,3 +4942,911 @@ button:disabled {
     font-size: 20px;
   }
 }
+
+/* =========================================
+   GOLD PORTFOLIO — VILTURE FINANCE
+========================================= */
+
+.gold-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 27px;
+  padding-bottom: 35px;
+}
+
+/* PAGE HEADER */
+
+.gold-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: 17px;
+  border-bottom: 1px solid var(--vf-line-strong);
+}
+
+.gold-page-header .eyebrow {
+  margin-bottom: 9px;
+  color: #c5a45d;
+  letter-spacing: 2px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.gold-page-header h1 {
+  margin: 0;
+  color: var(--vf-text);
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.gold-subtitle {
+  margin: 7px 0 0;
+  color: var(--vf-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* PORTFOLIO OVERVIEW */
+
+.gold-overview-card {
+  position: relative;
+  overflow: hidden;
+  padding: 19px;
+  border: 1px solid rgba(197, 164, 93, 0.4);
+  border-radius: 2px;
+  background:
+    linear-gradient(125deg, rgba(197, 164, 93, 0.09), transparent 55%),
+    var(--vf-surface);
+}
+
+.gold-overview-card::before {
+  content: "";
+  position: absolute;
+  top: -55px;
+  right: -45px;
+  width: 150px;
+  height: 150px;
+  border: 1px solid rgba(197, 164, 93, 0.17);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.gold-overview-card::after {
+  content: "";
+  position: absolute;
+  top: -25px;
+  right: -15px;
+  width: 100px;
+  height: 100px;
+  border: 1px solid rgba(197, 164, 93, 0.12);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.gold-overview-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 17px;
+  border-bottom: 1px solid rgba(197, 164, 93, 0.2);
+}
+
+.gold-overview-top > span:first-child {
+  color: #c5a45d;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+}
+
+.gold-symbol {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(197, 164, 93, 0.5);
+  color: #d4b66f;
+  font-family: Georgia, serif;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.gold-balance-label {
+  margin-top: 21px;
+  color: var(--vf-muted);
+  font-size: 10px;
+}
+
+.gold-overview-card h2 {
+  position: relative;
+  z-index: 1;
+  margin: 7px 0 20px;
+  color: var(--vf-text);
+  font-size: clamp(29px, 8vw, 38px);
+  font-weight: 700;
+  letter-spacing: -1.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gold-overview-card h2 span {
+  color: #c5a45d;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.gold-overview-divider {
+  height: 1px;
+  background: var(--vf-line);
+}
+
+.gold-overview-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding-top: 16px;
+}
+
+.gold-overview-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.gold-overview-stats > div + div {
+  padding-left: 14px;
+  border-left: 1px solid var(--vf-line);
+}
+
+.gold-overview-stats span {
+  color: var(--vf-muted);
+  font-size: 9px;
+}
+
+.gold-overview-stats strong {
+  color: var(--vf-text);
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* MARKET REFERENCE */
+
+.gold-market-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: var(--vf-surface);
+}
+
+.gold-market-card .eyebrow {
+  margin: 0 0 7px;
+  color: #c5a45d;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.gold-market-card h3 {
+  margin: 0;
+  color: var(--vf-text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.gold-market-card > div:first-child > p:last-child {
+  margin: 6px 0 0;
+  color: var(--vf-muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.gold-market-value {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.gold-market-value > span {
+  color: #c5a45d;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+}
+
+.gold-market-value > strong {
+  color: #c5a45d;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.4px;
+  text-align: center;
+}
+
+.gold-market-divider {
+  width: 42%;
+  height: 1px;
+  margin: 9px 0;
+  background: rgba(197, 164, 93, 0.3);
+}
+
+/* BUY & SELL ACTIONS */
+
+.gold-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.gold-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 53px;
+  padding: 10px;
+  border: 1px solid var(--vf-line-strong);
+  border-radius: 2px;
+  background: var(--vf-surface);
+  color: var(--vf-text);
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.gold-action:hover {
+  border-color: #c5a45d;
+  background: var(--vf-surface-3);
+}
+
+.gold-action-icon {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 1px solid rgba(197, 164, 93, 0.35);
+  color: #c5a45d;
+  font-size: 17px;
+}
+
+.gold-buy-action {
+  border-color: rgba(197, 164, 93, 0.45);
+}
+
+.gold-sell-action {
+  border-color: var(--vf-line-strong);
+}
+
+/* SECTION HEADINGS */
+
+.gold-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 9px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--vf-line-strong);
+}
+
+.gold-section-heading .eyebrow {
+  margin: 0 0 6px;
+  color: #c5a45d;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+}
+
+.gold-section-heading h2 {
+  margin: 0;
+  color: var(--vf-text);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.gold-record-count {
+  color: var(--vf-muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+/* EMPTY STATE */
+
+.gold-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 155px;
+  padding: 22px 18px;
+  border: 1px dashed var(--vf-line-strong);
+  border-radius: 2px;
+  background: var(--vf-surface);
+  text-align: center;
+}
+
+.gold-empty-symbol {
+  display: grid;
+  width: 43px;
+  height: 43px;
+  margin-bottom: 13px;
+  place-items: center;
+  border: 1px solid rgba(197, 164, 93, 0.4);
+  color: #c5a45d;
+  font-family: Georgia, serif;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.gold-empty-state h3 {
+  margin: 0;
+  color: var(--vf-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.gold-empty-state p {
+  max-width: 230px;
+  margin: 7px 0 0;
+  color: var(--vf-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+/* GOLD HOLDINGS */
+
+.gold-holdings-list {
+  overflow: hidden;
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: var(--vf-surface);
+}
+
+.gold-holding-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 69px;
+  padding: 12px;
+  border-bottom: 1px solid var(--vf-line);
+}
+
+.gold-holding-item:last-child {
+  border-bottom: 0;
+}
+
+.gold-holding-symbol {
+  display: grid;
+  width: 37px;
+  height: 37px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1px solid rgba(197, 164, 93, 0.35);
+  background: rgba(197, 164, 93, 0.07);
+  color: #c5a45d;
+  font-family: Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.gold-holding-info {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.gold-holding-info strong {
+  overflow: hidden;
+  color: var(--vf-text);
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gold-holding-info span,
+.gold-holding-amount span {
+  color: var(--vf-muted);
+  font-size: 9px;
+}
+
+.gold-holding-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.gold-holding-amount strong {
+  color: #c5a45d;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* TRANSACTION HISTORY */
+
+.gold-history-list {
+  overflow: hidden;
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: var(--vf-surface);
+}
+
+.gold-history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 73px;
+  padding: 12px;
+  border-bottom: 1px solid var(--vf-line);
+}
+
+.gold-history-item:last-child {
+  border-bottom: 0;
+}
+
+.gold-history-symbol {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1px solid var(--vf-line-strong);
+  background: var(--vf-surface-3);
+  color: var(--vf-text);
+  font-size: 17px;
+}
+
+.gold-history-info {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gold-history-info strong {
+  color: var(--vf-text);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.gold-history-info span {
+  overflow: hidden;
+  color: var(--vf-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gold-history-info small {
+  color: var(--vf-muted);
+  font-size: 8px;
+}
+
+.gold-history-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.gold-history-amount strong {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.gold-history-amount span {
+  color: var(--vf-muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gold-buy-text {
+  color: var(--vf-income);
+}
+
+.gold-sell-text {
+  color: var(--vf-danger);
+}
+
+/* EMPTY HISTORY */
+
+.gold-history-empty {
+  min-height: 120px;
+}
+
+.gold-history-empty p {
+  margin-top: 6px;
+}
+
+/* SMALL SCREENS */
+
+@media (max-width: 360px) {
+  .gold-page {
+    gap: 13px;
+  }
+
+  .gold-overview-card {
+    padding: 15px;
+  }
+
+  .gold-market-card {
+    padding: 13px;
+  }
+
+  .gold-market-card > div:first-child > p:last-child {
+    max-width: 145px;
+  }
+
+  .gold-history-item,
+  .gold-holding-item {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .gold-history-amount span {
+    font-size: 8px;
+  }
+}
+
+/* GOLD MARKET STATUS */
+.gold-market-info {
+  min-width: 0;
+}
+
+.gold-market-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+}
+
+.gold-status-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #999;
+}
+
+.gold-status-dot.is-connected {
+  background: #36b878;
+  box-shadow: 0 0 9px rgba(54, 184, 120, 0.45);
+}
+
+.gold-status-dot.is-error {
+  background: #dc6262;
+}
+
+.gold-market-updated {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.gold-market-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+
+.gold-market-value > span {
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  color: var(--text-secondary, #888);
+}
+
+.gold-market-value > strong {
+  font-size: clamp(14px, 2vw, 19px);
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.gold-market-divider {
+  width: 100%;
+  height: 1px;
+  margin: 5px 0;
+  background: var(--border-color, rgba(128, 128, 128, 0.2));
+}
+
+/* =================================
+   GOLD PRICE HISTORY CHART
+================================= */
+
+.gold-chart-card {
+  position: relative;
+  overflow: hidden;
+  margin: 20px 0;
+  padding: 22px;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.2));
+  border-radius: 18px;
+  background: var(--card-bg, var(--surface, #171717));
+}
+
+.gold-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.gold-chart-header h3 {
+  margin: 5px 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.gold-chart-description {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.gold-chart-live {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary, #999);
+}
+
+.gold-chart-live span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #559b83;
+}
+
+.gold-chart-periods {
+  display: flex;
+  gap: 5px;
+  margin: 22px 0 15px;
+  padding: 4px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.gold-chart-periods button {
+  min-width: 39px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary, #999);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.gold-chart-periods button.active {
+  background: var(--accent-color, #c69b48);
+  color: #fff;
+}
+
+.gold-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 10px;
+}
+
+.gold-chart-legend span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  color: var(--text-secondary, #999);
+}
+
+.gold-chart-legend i {
+  display: block;
+  width: 15px;
+  height: 3px;
+  border-radius: 4px;
+}
+
+.gold-legend-sell {
+  background: #c69b48;
+}
+
+.gold-legend-buyback {
+  background: #559b83;
+}
+
+.gold-chart-container {
+  width: 100%;
+  height: 230px;
+  margin-top: 10px;
+}
+
+.gold-chart-empty {
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  color: var(--text-secondary, #999);
+  font-size: 12px;
+}
+
+.gold-chart-empty strong {
+  color: var(--text-primary, #fff);
+  font-size: 13px;
+}
+
+.gold-chart-empty span {
+  max-width: 240px;
+  line-height: 1.6;
+}
+
+.gold-chart-footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 13px;
+  border-top: 1px solid var(--border-color, #333);
+  font-size: 10px;
+  color: var(--text-secondary, #888);
+}
+
+@media (max-width: 480px) {
+  .gold-chart-card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .gold-chart-header h3 {
+    font-size: 15px;
+  }
+
+  .gold-chart-periods {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .gold-chart-periods button {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 5px;
+  }
+
+  .gold-chart-footer {
+    font-size: 9px;
+  }
+}
+
+/* =====================================
+   MARKET REFERENCE — CENTERED GEOMETRIC
+===================================== */
+
+.gold-market-card.gold-market-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 19px 14px;
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: var(--vf-surface);
+  text-align: center;
+}
+
+.gold-market-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+
+.gold-market-card .eyebrow {
+  margin: 0;
+  color: #c5a45d;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.gold-live-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #559b83;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.gold-live-label .gold-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #559b83;
+}
+
+.gold-market-value {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.gold-market-value > span {
+  color: var(--vf-muted);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+}
+
+.gold-market-value > strong {
+  color: #c5a45d;
+  font-size: clamp(20px, 4vw, 25px);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.5px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.gold-market-divider {
+  width: 42%;
+  height: 1px;
+  margin: 7px 0;
+  background: var(--vf-line-strong);
+}
+
+.gold-market-updated {
+  margin: 0;
+  color: var(--vf-muted);
+  font-size: 9px;
+  text-align: center;
+}
+
+@media (max-width: 360px) {
+  .gold-market-card.gold-market-centered {
+    padding: 16px 10px;
+    gap: 13px;
+  }
+
+  .gold-market-value > strong {
+    font-size: 19px;
+  }
+}

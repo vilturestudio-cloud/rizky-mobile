@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+
 import {
   Activity,
   ArrowDownLeft,
@@ -26,6 +27,17 @@ import {
   X,
   Trash2,
 } from "lucide-react";
+
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
+
 import "./App.css";
 import { createWorker } from "tesseract.js";
 import { ensureAnonymousSession, supabase } from "./supabase";
@@ -108,6 +120,27 @@ type SavingsGoal = {
   currentAmount: number;
   targetDate: string | null;
   createdAt: string;
+};
+
+type GoldTransaction = {
+  id: string;
+  transactionType: "buy" | "sell";
+  goldBrand: string;
+  quantityGrams: number;
+  pricePerGram: number;
+  fees: number;
+  transactionDate: string;
+  note: string;
+};
+
+type GoldMarketPrice = {
+  success: boolean;
+  source: string;
+  weight: number;
+  sellPrice: number;
+  buybackPrice: number;
+  updatedAt: string;
+  fetchedAt: string;
 };
 
 type GoalContribution = {
@@ -248,6 +281,126 @@ function App() {
   });
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [goldTransactions, setGoldTransactions] = useState<GoldTransaction[]>(
+    [],
+  );
+  const [isGoldLoading, setIsGoldLoading] = useState(false);
+  const [goldMarketPrice, setGoldMarketPrice] =
+    useState<GoldMarketPrice | null>(null);
+
+  const [isGoldPriceLoading, setIsGoldPriceLoading] = useState(false);
+  const [goldPriceError, setGoldPriceError] = useState("");
+
+  const loadGoldMarketPrice = async () => {
+    setIsGoldPriceLoading(true);
+    setGoldPriceError("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke("super-api");
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.error || "Gagal mengambil harga emas");
+      }
+
+      setGoldMarketPrice(data);
+      await loadGoldPriceHistory();
+    } catch (error) {
+      console.error("Gold market price error:", error);
+
+      if (error && typeof error === "object" && "context" in error) {
+        const context = (error as { context?: unknown }).context;
+
+        if (context instanceof Response) {
+          console.error("Response status:", context.status);
+          console.error("Response body:", await context.text());
+        } else {
+          console.error("Error context:", context);
+        }
+      }
+
+      setGoldPriceError(
+        error instanceof Error ? error.message : "Gagal memuat harga emas",
+      );
+    } finally {
+      setIsGoldPriceLoading(false);
+    }
+  };
+
+  type GoldPriceHistory = {
+    id: string;
+    sell_price: number;
+    buyback_price: number;
+    source_updated_at: string | null;
+    recorded_at: string;
+  };
+
+  const [goldPriceHistory, setGoldPriceHistory] = useState<GoldPriceHistory[]>(
+    [],
+  );
+
+  const [goldChartPeriod, setGoldChartPeriod] = useState<
+    "1D" | "1W" | "1M" | "3M" | "1Y"
+  >("1W");
+
+  const filteredGoldHistory = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+
+    switch (goldChartPeriod) {
+      case "1D":
+        start.setDate(start.getDate() - 1);
+        break;
+      case "1W":
+        start.setDate(start.getDate() - 7);
+        break;
+      case "1M":
+        start.setMonth(start.getMonth() - 1);
+        break;
+      case "3M":
+        start.setMonth(start.getMonth() - 3);
+        break;
+      case "1Y":
+        start.setFullYear(start.getFullYear() - 1);
+        break;
+    }
+
+    return goldPriceHistory
+      .filter((item) => new Date(item.recorded_at) >= start)
+      .map((item) => ({
+        ...item,
+        chartTime: new Date(item.recorded_at).toLocaleString("id-ID", {
+          day: "2-digit",
+          month: "short",
+          hour: goldChartPeriod === "1D" ? "2-digit" : undefined,
+          minute: goldChartPeriod === "1D" ? "2-digit" : undefined,
+        }),
+      }));
+  }, [goldPriceHistory, goldChartPeriod]);
+
+  const [isGoldHistoryLoading, setIsGoldHistoryLoading] = useState(false);
+
+  const loadGoldPriceHistory = async () => {
+    setIsGoldHistoryLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("gold_price_history")
+        .select("id, sell_price, buyback_price, source_updated_at, recorded_at")
+        .eq("source", "ANTAM")
+        .eq("weight", 1)
+        .order("recorded_at", { ascending: true });
+
+      if (error) throw error;
+
+      setGoldPriceHistory(data ?? []);
+    } catch (error) {
+      console.error("Gold history error:", error);
+    } finally {
+      setIsGoldHistoryLoading(false);
+    }
+  };
+
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [savingsPockets, setSavingsPockets] = useState<SavingsPocket[]>([]);
   const [savingsMovements, setSavingsMovements] = useState<SavingsMovement[]>(
@@ -256,6 +409,24 @@ function App() {
   const [selectedSavingsPocketId, setSelectedSavingsPocketId] = useState<
     string | null
   >(null);
+
+  const goldTotalBought = goldTransactions
+    .filter((item) => item.transactionType === "buy")
+    .reduce((total, item) => total + item.quantityGrams, 0);
+
+  const goldTotalSold = goldTransactions
+    .filter((item) => item.transactionType === "sell")
+    .reduce((total, item) => total + item.quantityGrams, 0);
+
+  const goldOwnedGrams = goldTotalBought - goldTotalSold;
+
+  const goldTotalPurchase = goldTransactions
+    .filter((item) => item.transactionType === "buy")
+    .reduce(
+      (total, item) =>
+        total + item.quantityGrams * item.pricePerGram + item.fees,
+      0,
+    );
 
   const [showSavingsPocketModal, setShowSavingsPocketModal] = useState(false);
   const [savingsPocketName, setSavingsPocketName] = useState("");
@@ -268,15 +439,22 @@ function App() {
   >("deposit");
   const [savingsMovementAmount, setSavingsMovementAmount] = useState("");
   const [savingsMovementNote, setSavingsMovementNote] = useState("");
-  const [savingsMovementDate, setSavingsMovementDate] = useState(
-    new Date().toISOString().slice(0, 10),
+
+  const [savingsMovementDate, setSavingsMovementDate] = useState(() =>
+    toLocalDateOnly(new Date()),
   );
+
   const [isSavingSavingsMovement, setIsSavingSavingsMovement] = useState(false);
   const [budgets, setBudgets] = useState<Budget[]>([]);
 
   const [recurringTransactions, setRecurringTransactions] = useState<
     RecurringTransaction[]
   >([]);
+  const [confirmingRecurringId, setConfirmingRecurringId] = useState<
+    string | null
+  >(null);
+
+  const confirmingRecurringRef = useRef<Set<string>>(new Set());
 
   const [billReminders, setBillReminders] = useState<BillReminder[]>([]);
   const [showBillModal, setShowBillModal] = useState(false);
@@ -449,6 +627,11 @@ function App() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isCloudReady, setIsCloudReady] = useState(false);
   const [cloudError, setCloudError] = useState("");
+  useEffect(() => {
+    if (!isCloudReady) return;
+
+    void loadGoldMarketPrice();
+  }, [isCloudReady]);
 
   const [accountKind, setAccountKind] = useState<"Bank" | "E-Wallet">("Bank");
   const [bank, setBank] = useState("BCA");
@@ -484,21 +667,27 @@ function App() {
           transactionsResult,
           categoriesResult,
           savingsGoalsResult,
-          savingsPocketsResult,
-          savingsMovementsResult,
           contributionsResult,
           budgetsResult,
+          savingsPocketsResult,
+          savingsMovementsResult,
         ] = await Promise.all([
           supabase.from("accounts").select("*").eq("user_id", uid),
+
           supabase.from("transactions").select("*").eq("user_id", uid),
+
           supabase.from("categories").select("*").eq("user_id", uid),
+
           supabase.from("savings_goals").select("*").eq("user_id", uid),
+
           supabase.from("goal_contributions").select("*").eq("user_id", uid),
+
           supabase
             .from("budgets")
             .select("*")
             .eq("user_id", uid)
             .order("budget_month", { ascending: false }),
+
           supabase
             .from("savings_pockets")
             .select("*")
@@ -1505,12 +1694,18 @@ function App() {
       return;
     }
 
+    // Mencegah konfirmasi berulang untuk jadwal yang sama.
+    if (confirmingRecurringRef.current.has(item.id)) return;
+
     const today = toLocalDateOnly(new Date());
 
     if (item.nextDueDate > today) {
       notify("Jadwal ini belum jatuh tempo");
       return;
     }
+
+    confirmingRecurringRef.current.add(item.id);
+    setConfirmingRecurringId(item.id);
 
     try {
       const { data, error } = await supabase.rpc(
@@ -1521,6 +1716,7 @@ function App() {
       if (error) throw error;
 
       const transaction = data.transaction;
+
       const category = categories.find(
         (entry) =>
           entry.name === transaction.category &&
@@ -1538,7 +1734,14 @@ function App() {
         date: transaction.transaction_date,
       };
 
-      setTransactions((current) => [newTransaction, ...current]);
+      setTransactions((current) => {
+        // Hindari memasukkan transaksi yang sama dua kali ke state.
+        if (current.some((item) => item.id === newTransaction.id)) {
+          return current;
+        }
+
+        return [newTransaction, ...current];
+      });
 
       setRecurringTransactions((current) =>
         current.map((schedule) =>
@@ -1558,6 +1761,9 @@ function App() {
       const message = error instanceof Error ? error.message : String(error);
 
       notify(`Gagal: ${message}`);
+    } finally {
+      confirmingRecurringRef.current.delete(item.id);
+      setConfirmingRecurringId(null);
     }
   };
 
@@ -1684,7 +1890,7 @@ function App() {
     setShowSavingsMovementModal(false);
     setSavingsMovementAmount("");
     setSavingsMovementNote("");
-    setSavingsMovementDate(new Date().toISOString().slice(0, 10));
+    setSavingsMovementDate(toLocalDateOnly(new Date()));
   };
 
   const createSavingsMovement = async (event: FormEvent<HTMLFormElement>) => {
@@ -1745,7 +1951,7 @@ function App() {
       setShowSavingsMovementModal(false);
       setSavingsMovementAmount("");
       setSavingsMovementNote("");
-      setSavingsMovementDate(new Date().toISOString().slice(0, 10));
+      setSavingsMovementDate(toLocalDateOnly(new Date()));
 
       notify(
         savingsMovementType === "deposit"
@@ -2782,6 +2988,7 @@ function App() {
           item.id === editingTransactionId
             ? {
                 ...item,
+                categoryId: payload.category_id,
                 title: payload.description,
                 category: payload.category,
                 amount: payload.amount,
@@ -2965,6 +3172,45 @@ function App() {
       setIsDeletingAccount(false);
     }
   };
+
+  useEffect(() => {
+    const loadGoldTransactions = async () => {
+      if (!isCloudReady || !userId) return;
+
+      setIsGoldLoading(true);
+
+      try {
+        const { data, error } = await supabase
+          .from("gold_transactions")
+          .select("*")
+          .eq("user_id", userId)
+          .order("transaction_date", { ascending: false })
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        setGoldTransactions(
+          (data ?? []).map((item) => ({
+            id: item.id,
+            transactionType: item.transaction_type,
+            goldBrand: item.gold_brand,
+            quantityGrams: Number(item.quantity_grams),
+            pricePerGram: Number(item.price_per_gram),
+            fees: Number(item.fees),
+            transactionDate: item.transaction_date,
+            note: item.note ?? "",
+          })),
+        );
+      } catch (error) {
+        console.error("Load gold transactions error:", error);
+        notify("Gagal memuat data emas");
+      } finally {
+        setIsGoldLoading(false);
+      }
+    };
+
+    loadGoldTransactions();
+  }, [isCloudReady, userId]);
 
   const handleTab = (tab: string) => {
     if (tab === "Scan") {
@@ -3628,11 +3874,7 @@ function App() {
                 <span>Budget</span>
               </button>
 
-              <button
-                onClick={() =>
-                  notify("Fitur Emas akan kita kembangkan berikutnya")
-                }
-              >
+              <button onClick={() => setActiveTab("Gold")}>
                 <span className="shortcut-icon">
                   <Coins size={21} />
                 </span>
@@ -3871,8 +4113,11 @@ function App() {
                               type="button"
                               className="small-action"
                               onClick={() => confirmRecurringTransaction(item)}
+                              disabled={confirmingRecurringId === item.id}
                             >
-                              Confirm
+                              {confirmingRecurringId === item.id
+                                ? "Processing..."
+                                : "Confirm"}
                             </button>
                           )}
 
@@ -5194,6 +5439,434 @@ function App() {
               </div>
             );
           })()}
+
+        {activeTab === "Gold" && (
+          <section className="page-content gold-page">
+            <div className="gold-page-header">
+              <div>
+                <p className="eyebrow gold-eyebrow">VILTURE / ASSET</p>
+                <h1>Gold Portfolio</h1>
+                <p className="gold-subtitle">
+                  Track your precious metal holdings.
+                </p>
+              </div>
+            </div>
+
+            {/* Portfolio overview */}
+            <div className="gold-overview-card">
+              <div className="gold-overview-top">
+                <span>GOLD PORTFOLIO</span>
+                <span className="gold-symbol">Au</span>
+              </div>
+
+              <div className="gold-balance-label">Total gold owned</div>
+
+              <h2>
+                {goldOwnedGrams.toLocaleString("id-ID", {
+                  maximumFractionDigits: 6,
+                })}{" "}
+                <span>gram</span>
+              </h2>
+
+              <div className="gold-overview-divider" />
+
+              <div className="gold-overview-stats">
+                <div>
+                  <span>Total purchased</span>
+                  <strong>{rupiah(goldTotalPurchase)}</strong>
+                </div>
+
+                <div>
+                  <span>Transactions</span>
+                  <strong>{goldTransactions.length}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* ANTAM Market Price */}
+            <div className="gold-market-card gold-market-centered">
+              <div className="gold-market-heading">
+                <p className="eyebrow">ANTAM / LOGAM MULIA</p>
+                <span className="gold-live-label">
+                  <span className="gold-status-dot is-connected" />
+                  LIVE PRICE ANTAM
+                </span>
+              </div>
+
+              <div className="gold-market-value">
+                <span>SELL PRICE / GRAM</span>
+                <strong>
+                  {goldMarketPrice
+                    ? rupiah(goldMarketPrice.sellPrice)
+                    : isGoldPriceLoading
+                      ? "Loading..."
+                      : "—"}
+                </strong>
+
+                <div className="gold-market-divider" />
+
+                <span>BUYBACK PRICE / GRAM</span>
+                <strong>
+                  {goldMarketPrice ? rupiah(goldMarketPrice.buybackPrice) : "—"}
+                </strong>
+              </div>
+
+              <p className="gold-market-updated">
+                {goldMarketPrice
+                  ? `Updated ${new Date(
+                      goldMarketPrice.updatedAt,
+                    ).toLocaleString("id-ID", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}`
+                  : goldPriceError || "ANTAM · 1 gram"}
+              </p>
+            </div>
+
+            {/* GOLD PRICE CHART */}
+            <div className="gold-chart-card">
+              <div className="gold-chart-header">
+                <div>
+                  <p className="eyebrow">MARKET PERFORMANCE</p>
+                  <h3>Gold price history</h3>
+                  <span className="gold-chart-description">
+                    ANTAM · 1 gram · IDR
+                  </span>
+                </div>
+
+                <div className="gold-chart-live">
+                  <span />
+                  HISTORY
+                </div>
+              </div>
+
+              <div className="gold-chart-periods">
+                {(["1D", "1W", "1M", "3M", "1Y"] as const).map((period) => (
+                  <button
+                    key={period}
+                    type="button"
+                    className={goldChartPeriod === period ? "active" : ""}
+                    onClick={() => setGoldChartPeriod(period)}
+                  >
+                    {period}
+                  </button>
+                ))}
+              </div>
+
+              {isGoldHistoryLoading ? (
+                <div className="gold-chart-empty">Loading price history...</div>
+              ) : filteredGoldHistory.length === 0 ? (
+                <div className="gold-chart-empty">
+                  <ChartPie size={25} />
+                  <strong>No price history yet</strong>
+                  <span>
+                    Historical data will appear here when ANTAM prices change.
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div className="gold-chart-legend">
+                    <span>
+                      <i className="gold-legend-sell" />
+                      Sell price
+                    </span>
+                    <span>
+                      <i className="gold-legend-buyback" />
+                      Buyback price
+                    </span>
+                  </div>
+
+                  <div className="gold-chart-container">
+                    <ResponsiveContainer width="100%" height={230}>
+                      <AreaChart
+                        data={filteredGoldHistory}
+                        margin={{ top: 12, right: 5, left: 5, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient
+                            id="goldSellGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="#c69b48"
+                              stopOpacity={0.28}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#c69b48"
+                              stopOpacity={0}
+                            />
+                          </linearGradient>
+
+                          <linearGradient
+                            id="goldBuybackGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="#559b83"
+                              stopOpacity={0.18}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#559b83"
+                              stopOpacity={0}
+                            />
+                          </linearGradient>
+                        </defs>
+
+                        <CartesianGrid
+                          stroke="currentColor"
+                          strokeOpacity={0.1}
+                          strokeDasharray="3 4"
+                          vertical={false}
+                        />
+
+                        <XAxis
+                          dataKey="chartTime"
+                          tick={{ fontSize: 10, fill: "currentColor" }}
+                          tickLine={false}
+                          axisLine={false}
+                          minTickGap={25}
+                        />
+
+                        <YAxis
+                          domain={["auto", "auto"]}
+                          tickFormatter={(value: number) =>
+                            `${(value / 1000000).toFixed(2)}M`
+                          }
+                          tick={{ fontSize: 9, fill: "currentColor" }}
+                          tickLine={false}
+                          axisLine={false}
+                          width={48}
+                        />
+
+                        <Tooltip
+                          formatter={(value) => rupiah(Number(value))}
+                          contentStyle={{
+                            background: "var(--card-bg, #171717)",
+                            border: "1px solid var(--border-color, #333)",
+                            borderRadius: "10px",
+                            fontSize: "11px",
+                          }}
+                          labelStyle={{ color: "var(--text-secondary, #999)" }}
+                        />
+
+                        <Area
+                          type="monotone"
+                          dataKey="sell_price"
+                          name="Sell price"
+                          stroke="#c69b48"
+                          strokeWidth={2}
+                          fill="url(#goldSellGradient)"
+                          dot={false}
+                          activeDot={{ r: 4, strokeWidth: 0 }}
+                        />
+
+                        <Area
+                          type="monotone"
+                          dataKey="buyback_price"
+                          name="Buyback price"
+                          stroke="#559b83"
+                          strokeWidth={2}
+                          fill="url(#goldBuybackGradient)"
+                          dot={false}
+                          activeDot={{ r: 4, strokeWidth: 0 }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="gold-chart-footer">
+                    <span>
+                      {filteredGoldHistory.length} recorded price points
+                    </span>
+                    <span>
+                      Latest:{" "}
+                      {new Date(
+                        filteredGoldHistory[filteredGoldHistory.length - 1]
+                          .recorded_at,
+                      ).toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Quick actions */}
+            <div className="gold-action-grid">
+              <button
+                type="button"
+                className="gold-action gold-buy-action"
+                onClick={() =>
+                  notify("Buy Gold akan kita aktifkan di tahap berikutnya")
+                }
+              >
+                <span className="gold-action-icon">＋</span>
+                <span>Buy Gold</span>
+              </button>
+
+              <button
+                type="button"
+                className="gold-action gold-sell-action"
+                onClick={() =>
+                  notify("Sell Gold akan kita aktifkan di tahap berikutnya")
+                }
+              >
+                <span className="gold-action-icon">－</span>
+                <span>Sell Gold</span>
+              </button>
+            </div>
+
+            {/* Holdings */}
+            <div className="gold-section-heading">
+              <div>
+                <p className="eyebrow">YOUR ASSETS</p>
+                <h2>Gold holdings</h2>
+              </div>
+            </div>
+
+            {goldOwnedGrams <= 0 ? (
+              <div className="gold-empty-state">
+                <div className="gold-empty-symbol">Au</div>
+                <h3>No gold holdings yet</h3>
+                <p>
+                  Your gold purchases will appear here once you start recording
+                  transactions.
+                </p>
+              </div>
+            ) : (
+              <div className="gold-holdings-list">
+                {["Antam", "UBS", "Digital Gold", "Other"].map((brand) => {
+                  const bought = goldTransactions
+                    .filter(
+                      (item) =>
+                        item.transactionType === "buy" &&
+                        item.goldBrand === brand,
+                    )
+                    .reduce((total, item) => total + item.quantityGrams, 0);
+
+                  const sold = goldTransactions
+                    .filter(
+                      (item) =>
+                        item.transactionType === "sell" &&
+                        item.goldBrand === brand,
+                    )
+                    .reduce((total, item) => total + item.quantityGrams, 0);
+
+                  const balance = bought - sold;
+
+                  if (balance <= 0) return null;
+
+                  return (
+                    <div className="gold-holding-item" key={brand}>
+                      <div className="gold-holding-symbol">Au</div>
+
+                      <div className="gold-holding-info">
+                        <strong>{brand}</strong>
+                        <span>Gold ownership</span>
+                      </div>
+
+                      <div className="gold-holding-amount">
+                        <strong>
+                          {balance.toLocaleString("id-ID", {
+                            maximumFractionDigits: 6,
+                          })}{" "}
+                          g
+                        </strong>
+                        <span>Owned</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Transaction history */}
+            <div className="gold-section-heading">
+              <div>
+                <p className="eyebrow">RECORDS</p>
+                <h2>Transaction history</h2>
+              </div>
+
+              <span className="gold-record-count">
+                {goldTransactions.length} records
+              </span>
+            </div>
+
+            {isGoldLoading ? (
+              <div className="gold-empty-state">
+                <p>Loading gold transactions...</p>
+              </div>
+            ) : goldTransactions.length === 0 ? (
+              <div className="gold-empty-state gold-history-empty">
+                <h3>No transactions</h3>
+                <p>Your buy and sell history will be recorded here.</p>
+              </div>
+            ) : (
+              <div className="gold-history-list">
+                {goldTransactions.map((transaction) => (
+                  <div className="gold-history-item" key={transaction.id}>
+                    <div className="gold-history-symbol">
+                      {transaction.transactionType === "buy" ? "＋" : "－"}
+                    </div>
+
+                    <div className="gold-history-info">
+                      <strong>
+                        {transaction.transactionType === "buy"
+                          ? "Buy Gold"
+                          : "Sell Gold"}
+                      </strong>
+
+                      <span>
+                        {transaction.goldBrand}
+                        {transaction.note ? ` · ${transaction.note}` : ""}
+                      </span>
+
+                      <small>{transaction.transactionDate}</small>
+                    </div>
+
+                    <div className="gold-history-amount">
+                      <strong
+                        className={
+                          transaction.transactionType === "buy"
+                            ? "gold-buy-text"
+                            : "gold-sell-text"
+                        }
+                      >
+                        {transaction.transactionType === "buy" ? "+" : "-"}
+                        {transaction.quantityGrams.toLocaleString("id-ID", {
+                          maximumFractionDigits: 6,
+                        })}{" "}
+                        g
+                      </strong>
+
+                      <span>
+                        {rupiah(
+                          transaction.quantityGrams * transaction.pricePerGram +
+                            (transaction.transactionType === "buy"
+                              ? transaction.fees
+                              : -transaction.fees),
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {activeTab === "Activity" && (
           <div className="page-content secondary-page activity-page">
