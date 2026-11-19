@@ -7,13 +7,25 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Supabase URL atau Anon Key belum dikonfigurasi.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
+const createSupabaseClient = () =>
+  createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
+
+const globalForSupabase = globalThis as typeof globalThis & {
+  __viltureSupabase?: ReturnType<typeof createSupabaseClient>;
+};
+
+export const supabase =
+  globalForSupabase.__viltureSupabase ?? createSupabaseClient();
+
+if (import.meta.env.DEV) {
+  globalForSupabase.__viltureSupabase = supabase;
+}
 
 // Mengirim OTP untuk login atau menghubungkan akun anonim ke email.
 export async function sendLoginOtp(email: string) {
@@ -26,8 +38,6 @@ export async function sendLoginOtp(email: string) {
 
   if (sessionError) throw sessionError;
 
-  // Jika masih menggunakan akun anonim,
-  // bersihkan sesi lokal sebelum login dengan email.
   if (session?.user.is_anonymous) {
     const { error: logoutError } = await supabase.auth.signOut({
       scope: "local",
@@ -36,7 +46,6 @@ export async function sendLoginOtp(email: string) {
     if (logoutError) throw logoutError;
   }
 
-  // Login atau registrasi menggunakan OTP.
   const { error } = await supabase.auth.signInWithOtp({
     email: normalizedEmail,
     options: {

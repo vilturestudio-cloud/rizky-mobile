@@ -6648,3 +6648,888 @@ button:disabled {
   background: rgba(225, 120, 120, 0.12);
   color: #ff9999;
 }
+
+/* PROFILE IDENTITY */
+
+.profile-identity-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.profile-identity-info strong {
+  color: var(--vf-text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.profile-identity-info span {
+  color: var(--vf-text-soft);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.profile-identity-info small {
+  color: var(--vf-muted);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+
+.profile-edit-button {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--vf-line);
+  border-radius: 2px;
+  background: var(--vf-surface-2);
+  color: var(--vf-accent);
+  cursor: pointer;
+}
+
+.profile-edit-button:hover {
+  border-color: var(--vf-accent);
+}
+
+/* PROFILE EMAIL SETTINGS */
+
+.profile-setting-card {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid var(--vf-line);
+  background: var(--vf-surface);
+}
+
+.profile-setting-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-setting-heading .eyebrow {
+  margin: 0 0 6px;
+}
+
+.profile-setting-heading strong {
+  color: var(--vf-text);
+  font-size: 12px;
+}
+
+.profile-current-email {
+  display: block;
+  margin-top: 14px;
+  color: var(--vf-text-soft);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.profile-pending-email {
+  margin: 10px 0 0;
+  color: var(--vf-accent);
+  font-size: 10px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* =================================
+   PROFILE INFORMATION
+================================= */
+
+.profile-section {
+  width: 100%;
+  margin-top: 24px;
+}
+
+.profile-section-heading {
+  padding: 0 2px 10px;
+}
+
+.profile-section-heading .eyebrow {
+  margin: 0;
+  font-size: 9px;
+  letter-spacing: 1.4px;
+  opacity: 0.65;
+}
+
+.profile-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--vf-line);
+}
+
+.profile-info-row:first-of-type {
+  border-top: 1px solid var(--vf-line);
+}
+
+.profile-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.profile-info-content span {
+  font-size: 10px;
+  color: var(--vf-text-soft);
+}
+
+.profile-info-content strong {
+  font-size: 11px;
+  color: var(--vf-text);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.profile-info-content small {
+  color: var(--vf-accent);
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.profile-edit-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--vf-line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--vf-text-soft);
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.profile-edit-button:hover {
+  color: var(--vf-accent);
+  border-color: var(--vf-accent);
+}
+
+.account-information-section {
+  margin-top: 30px;
+}
+
+.account-information-section .settings-row {
+  min-height: 37px;
+  margin: 0;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--vf-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.account-information-section .settings-row:first-of-type {
+  border-top: 1px solid var(--vf-line);
+}
+
+.account-information-section .settings-row span {
+  font-size: 10px;
+}
+
+.account-information-section .settings-row strong {
+  font-size: 10px;
+}
+
+/* ACCOUNT SECURITY */
+.account-security-section {
+  margin-top: 30px;
+}
+
+/* LOGIN INFORMATION */
+.profile-login-activity {
+  overflow: hidden;
+}
+
+.login-activity-table {
+  width: 100%;
+  margin-top: 14px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.login-activity-head,
+.login-activity-row {
+  display: grid;
+  grid-template-columns: 38% 62%;
+  align-items: center;
+}
+
+.login-activity-head {
+  min-height: 38px;
+  background: rgba(128, 128, 128, 0.06);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  opacity: 0.55;
+}
+
+.login-activity-row {
+  min-height: 50px;
+  font-size: 12px;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.09));
+}
+
+.login-activity-head span,
+.login-activity-row span {
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.login-activity-head span:first-child,
+.login-activity-row span:first-child {
+  border-right: 1px solid var(--border-color, rgba(255, 255, 255, 0.09));
+}
+
+.login-activity-row span:first-child {
+  opacity: 0.55;
+}
+
+.login-activity-row span:last-child {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.login-activity-row .session-active {
+  color: #65c98b;
+  font-weight: 600;
+}
+
+.login-activity-row .session-inactive {
+  color: #d46d6d;
+  font-weight: 600;
+}
+
+/* RECENT SIGN-INS */
+.login-history-section {
+  margin-top: 20px;
+}
+
+.login-history-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--text-secondary, #888);
+}
+
+.login-history-table {
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.login-history-table-head,
+.login-history-table-row {
+  display: grid;
+  grid-template-columns:
+    minmax(120px, 1.15fr) minmax(78px, 0.8fr) minmax(90px, 1fr)
+    minmax(112px, 0.85fr);
+  align-items: center;
+  min-width: 480px;
+}
+
+.login-history-table-head {
+  min-height: 38px;
+  background: rgba(128, 128, 128, 0.06);
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.55;
+}
+
+.login-history-table-row {
+  min-height: 48px;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.09));
+  font-size: 10px;
+}
+
+.login-history-table-head span,
+.login-history-table-row span {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
+  padding: 10px;
+  overflow-wrap: anywhere;
+}
+
+.login-history-table-head span:not(:last-child),
+.login-history-table-row span:not(:last-child) {
+  border-right: 1px solid var(--border-color, rgba(255, 255, 255, 0.09));
+}
+
+.login-history-table-row .session-active {
+  color: #65c98b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.login-history-empty {
+  padding: 18px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.09));
+}
+
+.login-history-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.login-history-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.login-history-delete:hover {
+  color: #d46d6d;
+  border-color: rgba(212, 109, 109, 0.45);
+  background: rgba(212, 109, 109, 0.08);
+}
+
+.security-logout-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid var(--vf-line);
+  border-radius: 7px;
+  background: transparent;
+  color: #e27676;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.security-logout-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* =====================================================
+   VILTURE FINANCE — SAFE SMOOTH MOTION
+   Based on your actual CSS structure
+   No layout / position / transform interference
+===================================================== */
+
+/* -----------------------------
+   1. MOTION VARIABLES
+----------------------------- */
+
+:root {
+  --vf-motion-fast: 160ms;
+  --vf-motion-normal: 240ms;
+  --vf-motion-smooth: 380ms;
+  --vf-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* -----------------------------
+   2. BUTTON COLOR FEEDBACK
+   No movement
+----------------------------- */
+
+.primary-button,
+.icon-button,
+.small-action,
+.edit-account-button,
+.security-logout-button,
+.login-history-delete,
+.transaction-shortcuts button,
+.quick-actions button {
+  transition:
+    color 240ms var(--vf-motion-ease),
+    background-color 240ms var(--vf-motion-ease),
+    border-color 240ms var(--vf-motion-ease),
+    box-shadow 240ms var(--vf-motion-ease),
+    opacity 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) {
+  .primary-button:hover:not(:disabled),
+  .icon-button:hover:not(:disabled),
+  .small-action:hover:not(:disabled),
+  .edit-account-button:hover:not(:disabled),
+  .security-logout-button:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+}
+
+.primary-button:active:not(:disabled),
+.icon-button:active:not(:disabled),
+.small-action:active:not(:disabled),
+.edit-account-button:active:not(:disabled),
+.security-logout-button:active:not(:disabled),
+.login-history-delete:active:not(:disabled),
+.transaction-shortcuts button:active:not(:disabled),
+.quick-actions button:active:not(:disabled) {
+  opacity: 0.72;
+}
+
+/* -----------------------------
+   3. BOTTOM NAVIGATION
+   Preserve original Scan lift
+----------------------------- */
+
+.bottom-nav {
+  transition:
+    background-color 300ms ease,
+    border-color 300ms ease;
+}
+
+.bottom-nav > button {
+  transition:
+    color 220ms ease,
+    background-color 220ms ease,
+    opacity 180ms ease;
+}
+
+/* Scan's translateY(-9px) remains untouched */
+.bottom-nav .scan-nav-button {
+  transition:
+    color 220ms ease,
+    opacity 180ms ease;
+}
+
+.bottom-nav .scan-nav-button > span {
+  transition:
+    background-color 240ms ease,
+    color 240ms ease,
+    box-shadow 240ms ease;
+}
+
+/* No movement on nav press */
+.bottom-nav button:active {
+  opacity: 0.78;
+}
+
+/* -----------------------------
+   4. BANK CARD
+   Keep original carousel transforms
+----------------------------- */
+
+.card-stack .bank-card {
+  transition:
+    transform 400ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 380ms ease,
+    opacity 300ms ease,
+    filter 300ms ease;
+}
+
+/* Do not override card-front/back/hidden transforms */
+
+/* -----------------------------
+   5. TRANSACTION INTERACTIONS
+----------------------------- */
+
+.transaction-clickable,
+.transaction-item {
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    opacity 220ms ease;
+}
+
+@media (hover: hover) {
+  .transaction-clickable:hover,
+  .transaction-item:hover {
+    background-color: rgba(128, 128, 128, 0.045);
+  }
+}
+
+/* -----------------------------
+   6. BUDGET INTERACTIONS
+----------------------------- */
+
+.budget-item-clickable {
+  transition:
+    border-color 260ms ease,
+    background-color 260ms ease;
+}
+
+@media (hover: hover) {
+  .budget-item-clickable:hover {
+    border-color: rgba(53, 214, 196, 0.5);
+    background-color: rgba(53, 214, 196, 0.025);
+  }
+}
+
+/* -----------------------------
+   7. INPUT FOCUS
+----------------------------- */
+
+input,
+textarea,
+select {
+  transition:
+    border-color 240ms ease,
+    background-color 240ms ease,
+    box-shadow 240ms ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+
+/* -----------------------------
+   8. MODAL
+   Keep existing modal-in animation
+----------------------------- */
+
+.account-modal {
+  transition:
+    opacity 260ms ease,
+    background-color 260ms ease;
+}
+
+/* Existing @keyframes modal-in remains intact */
+
+/* -----------------------------
+   9. MODAL BACKDROP
+----------------------------- */
+
+.modal-backdrop {
+  transition: background-color 260ms ease;
+}
+
+/* -----------------------------
+   10. TOAST
+   Keep existing toast-in animation
+----------------------------- */
+
+.toast-message {
+  transition:
+    opacity 220ms ease,
+    background-color 220ms ease;
+}
+
+/* Existing @keyframes toast-in remains intact */
+
+/* -----------------------------
+   11. ACCOUNT / PROFILE ROWS
+----------------------------- */
+
+.settings-row,
+.profile-panel,
+.login-history-table-row {
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease;
+}
+
+@media (hover: hover) {
+  .settings-row:hover,
+  .login-history-table-row:hover {
+    background-color: rgba(128, 128, 128, 0.025);
+  }
+}
+
+/* -----------------------------
+   12. PROGRESS INDICATORS
+----------------------------- */
+
+.budget-progress-fill,
+.goal-progress-fill,
+.scan-progress-track i {
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* -----------------------------
+   13. LOGIN HISTORY DELETE
+----------------------------- */
+
+.login-history-delete {
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    opacity 180ms ease;
+}
+
+@media (hover: hover) {
+  .login-history-delete:hover {
+    color: #d46d6d;
+    border-color: rgba(212, 109, 109, 0.45);
+    background-color: rgba(212, 109, 109, 0.08);
+  }
+}
+
+/* -----------------------------
+   14. SCAN CAMERA CONTROLS
+----------------------------- */
+
+.scan-gallery-button,
+.scan-shutter,
+.scan-camera-icon {
+  transition:
+    opacity 180ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease;
+}
+
+.scan-shutter:active:not(:disabled),
+.scan-gallery-button:active:not(:disabled) {
+  opacity: 0.78;
+}
+
+/* Keep scanner spinner's original rotation */
+.scan-processing-spinner {
+  animation: scan-spin 0.8s linear infinite;
+}
+
+/* -----------------------------
+   15. ACCESSIBILITY
+----------------------------- */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(53, 214, 196, 0.6);
+  outline-offset: 3px;
+}
+
+/* -----------------------------
+   16. REDUCED MOTION
+----------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================
+   VILTURE — PAGE FADE TRANSITION
+   SAFE: OPACITY ONLY
+========================================== */
+
+@keyframes vilture-page-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.page-content {
+  animation: vilture-page-fade 260ms ease-out both;
+}
+
+/* Protect fixed bottom navigation */
+.bottom-nav {
+  animation: none !important;
+}
+
+/* Protect raised scan button */
+.bottom-nav .scan-nav-button {
+  transform: translateY(-9px) !important;
+  animation: none !important;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .page-content {
+    animation: none !important;
+  }
+}
+
+/* VILTURE — MODAL POLISH */
+
+.account-modal {
+  transition:
+    opacity 260ms ease,
+    box-shadow 300ms ease,
+    border-color 260ms ease;
+}
+
+.modal-backdrop {
+  transition:
+    opacity 260ms ease,
+    backdrop-filter 300ms ease;
+}
+
+/* =========================================
+   VILTURE — DOCUMENT SCANNER MOTION
+========================================= */
+
+.scan-guide-frame {
+  overflow: hidden;
+}
+
+/* Animated scanning line */
+.scan-guide-frame::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(53, 214, 196, 0.25) 10%,
+    #35d6c4 50%,
+    rgba(53, 214, 196, 0.25) 90%,
+    transparent 100%
+  );
+
+  box-shadow:
+    0 0 8px rgba(53, 214, 196, 0.65),
+    0 0 20px rgba(53, 214, 196, 0.25);
+
+  animation: vilture-scan-line 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Soft light beneath scanning line */
+.scan-guide-frame::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 70px;
+  top: 0;
+
+  background: linear-gradient(to bottom, rgba(53, 214, 196, 0.12), transparent);
+
+  animation: vilture-scan-glow 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes vilture-scan-line {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes vilture-scan-glow {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateY(calc(100% - 70px));
+    opacity: 0;
+  }
+}
+
+/* Respect reduced motion settings */
+@media (prefers-reduced-motion: reduce) {
+  .scan-guide-frame::before,
+  .scan-guide-frame::after {
+    animation: none !important;
+  }
+}
+
+/* ==============================
+   TRANSACTION LIST MOTION
+============================== */
+
+.transaction-list > .transaction-item {
+  animation: vilture-transaction-enter 420ms cubic-bezier(0.2, 0.65, 0.3, 1)
+    both;
+}
+
+.transaction-list > .transaction-item:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.transaction-list > .transaction-item:nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.transaction-list > .transaction-item:nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.transaction-list > .transaction-item:nth-child(4) {
+  animation-delay: 135ms;
+}
+
+.transaction-list > .transaction-item:nth-child(5) {
+  animation-delay: 180ms;
+}
+
+@keyframes vilture-transaction-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respect reduced-motion settings */
+@media (prefers-reduced-motion: reduce) {
+  .transaction-list > .transaction-item {
+    animation: none !important;
+  }
+}
+
+

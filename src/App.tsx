@@ -691,6 +691,15 @@ function App() {
   const [isReadingReceipt, setIsReadingReceipt] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [profileNameInput, setProfileNameInput] = useState("");
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
   const [isCloudReady, setIsCloudReady] = useState(false);
   const [cloudError, setCloudError] = useState("");
   // AUTHENTICATION
@@ -706,6 +715,12 @@ function App() {
 
     void loadGoldMarketPrice();
   }, [isCloudReady]);
+
+  const [animatedBalance, setAnimatedBalance] = useState(0);
+
+  const animatedBalanceRef = useRef(0);
+  const balanceAnimationRef = useRef<number | null>(null);
+  const hasInitialBalanceAnimation = useRef(false);
 
   const [accountKind, setAccountKind] = useState<"Bank" | "E-Wallet">("Bank");
   const [bank, setBank] = useState("BCA");
@@ -723,6 +738,28 @@ function App() {
   const [transactionType, setTransactionType] = useState<"expense" | "income">(
     "expense",
   );
+
+  // AUTH SESSION LISTENER
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        setUserId(null);
+        setUserEmail("");
+        setIsCloudReady(false);
+        setIsAuthChecking(false);
+      }
+
+      if (event === "USER_UPDATED" && session?.user) {
+        setUserEmail(session.user.email ?? "");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // Ambil data cloud saat aplikasi dibuka. Jika akun cloud masih kosong,
   // data lokal lama akan dimigrasikan satu kali ke akun anonim perangkat ini.
@@ -750,7 +787,12 @@ function App() {
         }
 
         const uid = session.user.id;
+        const savedName = session.user.user_metadata?.display_name ?? "";
+
         setUserId(uid);
+        setUserEmail(session.user.email ?? "");
+        setDisplayName(savedName);
+        setProfileNameInput(savedName);
 
         const [
           accountsResult,
@@ -1066,6 +1108,38 @@ function App() {
     void loadRecurringTransactions();
   }, [isCloudReady, userId]);
 
+  // LOAD LOGIN HISTORY FROM SUPABASE
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadLoginHistory = async () => {
+      const { data, error } = await supabase
+        .from("login_history")
+        .select("id, login_time, device, browser")
+        .eq("user_id", userId)
+        .order("login_time", { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error("Failed to load login history:", error);
+        return;
+      }
+
+      const history: LoginHistoryEntry[] = (data ?? []).map((entry) => ({
+        id: entry.id,
+        time: entry.login_time,
+        device: entry.device,
+        browser: entry.browser,
+      }));
+
+      setLoginHistory(history);
+
+      localStorage.setItem("vilture-login-history", JSON.stringify(history));
+    };
+
+    loadLoginHistory();
+  }, [userId]);
+
   useEffect(() => {
     if (!isCloudReady || !userId) return;
 
@@ -1287,6 +1361,82 @@ function App() {
 
   const getAccountBalance = (accountId: string) =>
     accountBalances[accountId] ?? 0;
+  const balanceTarget = selectedAccount
+    ? getAccountBalance(selectedAccount.id)
+    : 0;
+
+  useEffect(() => {
+    // Tunggu data cloud selesai dimuat
+    if (!isCloudReady) return;
+
+    if (!selectedAccount) {
+      animatedBalanceRef.current = 0;
+      setAnimatedBalance(0);
+      hasInitialBalanceAnimation.current = false;
+      return;
+    }
+
+    if (balanceAnimationRef.current !== null) {
+      cancelAnimationFrame(balanceAnimationRef.current);
+      balanceAnimationRef.current = null;
+    }
+
+    const endValue = balanceTarget;
+
+    // Pertama kali masuk: mulai dari Rp 0
+    // Perubahan selanjutnya: mulai dari angka terakhir
+    const startValue = hasInitialBalanceAnimation.current
+      ? animatedBalanceRef.current
+      : 0;
+
+    hasInitialBalanceAnimation.current = true;
+
+    const duration = 1600;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      animatedBalanceRef.current = endValue;
+      setAnimatedBalance(endValue);
+      return;
+    }
+
+    if (startValue === endValue) {
+      animatedBalanceRef.current = endValue;
+      setAnimatedBalance(endValue);
+      return;
+    }
+
+    let startTime: number | null = null;
+
+    const animate = (timestamp: number) => {
+      if (startTime === null) startTime = timestamp;
+
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+
+      const eased = 1 - Math.pow(1 - progress, 4);
+
+      const value = startValue + (endValue - startValue) * eased;
+
+      const currentValue = progress >= 1 ? endValue : value;
+
+      animatedBalanceRef.current = currentValue;
+      setAnimatedBalance(currentValue);
+
+      if (progress < 1) {
+        balanceAnimationRef.current = requestAnimationFrame(animate);
+      } else {
+        balanceAnimationRef.current = null;
+      }
+    };
+
+    balanceAnimationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (balanceAnimationRef.current !== null) {
+        cancelAnimationFrame(balanceAnimationRef.current);
+        balanceAnimationRef.current = null;
+      }
+    };
+  }, [isCloudReady, selectedAccount?.id, balanceTarget]);
 
   const selectedTransactions = useMemo(
     () =>
@@ -1380,6 +1530,67 @@ function App() {
 
     try {
       await verifyLoginOtp(loginEmail, loginOtp, loginMode);
+      const loginTime = new Date().toISOString();
+      const ua = navigator.userAgent;
+
+      const device = /iPad|Tablet/i.test(ua)
+        ? "Tablet"
+        : /Android|iPhone|Mobile/i.test(ua)
+          ? "Mobile"
+          : "Desktop";
+
+      const browser = /Edg\//.test(ua)
+        ? "Microsoft Edge"
+        : /Firefox\//.test(ua)
+          ? "Firefox"
+          : /Chrome\//.test(ua)
+            ? "Chrome"
+            : /Safari\//.test(ua)
+              ? "Safari"
+              : "Unknown Browser";
+
+      const newLogin: LoginHistoryEntry = {
+        id: crypto.randomUUID(),
+        time: loginTime,
+        device,
+        browser,
+      };
+
+      // SAVE LOGIN HISTORY TO SUPABASE
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          const { error } = await supabase.from("login_history").insert({
+            user_id: user.id,
+            login_time: loginTime,
+            device,
+            browser,
+          });
+
+          if (error) {
+            console.error("Failed to save login history:", error);
+          }
+        }
+      } catch (error) {
+        console.error("Login history cloud error:", error);
+      }
+
+      const previousHistory: LoginHistoryEntry[] = JSON.parse(
+        localStorage.getItem("vilture-login-history") || "[]",
+      );
+
+      const updatedHistory = [newLogin, ...previousHistory].slice(0, 10);
+
+      localStorage.setItem(
+        "vilture-login-history",
+        JSON.stringify(updatedHistory),
+      );
+      setLoginHistory(updatedHistory);
+
+      localStorage.setItem("vilture-last-login", loginTime);
 
       // Sesi sudah tersimpan oleh Supabase.
       // Muat ulang agar proses inisialisasi cloud berjalan kembali.
@@ -1412,6 +1623,139 @@ function App() {
       notify("Gagal keluar dari akun.");
     }
   };
+
+  const handleUpdateEmail = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const email = newEmail.trim().toLowerCase();
+
+    if (!email) {
+      notify("Masukkan email baru.");
+      return;
+    }
+
+    if (email === userEmail.toLowerCase()) {
+      notify("Email baru sama dengan email saat ini.");
+      return;
+    }
+
+    setIsUpdatingEmail(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        email,
+      });
+
+      if (error) throw error;
+
+      setPendingEmail(email);
+      setNewEmail("");
+      setShowEmailModal(false);
+
+      notify("Permintaan perubahan email berhasil dikirim.");
+    } catch (error) {
+      console.error("Update email error:", error);
+
+      notify(error instanceof Error ? error.message : "Gagal mengubah email.");
+    } finally {
+      setIsUpdatingEmail(false);
+    }
+  };
+
+  const handleDeleteLoginHistory = async (id: string) => {
+    const { error } = await supabase
+      .from("login_history")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Failed to delete login history:", error);
+      return;
+    }
+
+    setLoginHistory((prev) => prev.filter((entry) => entry.id !== id));
+
+    localStorage.setItem(
+      "vilture-login-history",
+      JSON.stringify(loginHistory.filter((entry) => entry.id !== id)),
+    );
+  };
+
+  const saveProfileName = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const name = profileNameInput.trim();
+
+    if (!name) {
+      notify("Nama tidak boleh kosong.");
+      return;
+    }
+
+    setIsSavingProfile(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          display_name: name,
+        },
+      });
+
+      if (error) throw error;
+
+      setDisplayName(name);
+      setShowProfileModal(false);
+      notify("Nama profil berhasil diperbarui.");
+    } catch (error) {
+      console.error("Update profile error:", error);
+      notify("Gagal memperbarui nama profil.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const [lastLoginAt] = useState(
+    () => localStorage.getItem("vilture-last-login") ?? "",
+  );
+  type LoginHistoryEntry = {
+    id: string;
+    time: string;
+    device: string;
+    browser: string;
+  };
+
+  const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("vilture-login-history") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const lastLoginLabel = lastLoginAt
+    ? new Date(lastLoginAt).toLocaleString("id-ID", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "Not recorded";
+
+  const ua = navigator.userAgent;
+
+  const deviceLabel = /iPad|Tablet/i.test(ua)
+    ? "Tablet"
+    : /Android|iPhone|Mobile/i.test(ua)
+      ? "Mobile"
+      : "Desktop";
+
+  const browserLabel = /Edg\//.test(ua)
+    ? "Microsoft Edge"
+    : /Firefox\//.test(ua)
+      ? "Firefox"
+      : /Chrome\//.test(ua)
+        ? "Chrome"
+        : /Safari\//.test(ua)
+          ? "Safari"
+          : "Unknown browser";
 
   const openAddRecurring = () => {
     setEditingRecurringId(null);
@@ -4158,7 +4502,7 @@ function App() {
               <div className="total-value">
                 {selectedAccount
                   ? showBalance
-                    ? rupiah(getAccountBalance(selectedAccount.id))
+                    ? rupiah(Math.round(animatedBalance))
                     : "••••••••"
                   : "Rp 0"}
               </div>
@@ -6825,50 +7169,200 @@ function App() {
                   Pengaturan personal VILTURE Finance.
                 </p>
 
-                {/* PROFILE IDENTITY */}
-                <div className="profile-panel">
-                  <div className="profile-avatar">V</div>
-                  <div>
-                    <strong>Personal workspace</strong>
-                    <span>VILTURE Finance</span>
+                {/* PROFILE INFORMATION */}
+                <div className="profile-section">
+                  <div className="profile-section-heading">
+                    <p className="eyebrow">PROFILE INFORMATION</p>
+                  </div>
+
+                  <div className="profile-info-row">
+                    <div className="profile-info-content">
+                      <span>Profile Name</span>
+                      <strong>{displayName || "User Account"}</strong>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="profile-edit-button"
+                      onClick={() => setShowProfileModal(true)}
+                      aria-label="Edit profile name"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                  </div>
+
+                  <div className="profile-info-row">
+                    <div className="profile-info-content">
+                      <span>Email Address</span>
+                      <strong>{userEmail || "No email available"}</strong>
+
+                      {pendingEmail && (
+                        <small>Waiting for verification: {pendingEmail}</small>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="profile-edit-button"
+                      onClick={() => {
+                        setNewEmail("");
+                        setShowEmailModal(true);
+                      }}
+                      aria-label="Change email address"
+                    >
+                      <Pencil size={15} />
+                    </button>
                   </div>
                 </div>
 
-                {/* DATA INFORMATION */}
-                <div className="settings-row">
-                  <span>Data storage</span>
-                  <strong>
-                    {isCloudReady ? "Supabase Cloud" : "Connecting..."}
-                  </strong>
+                {/* ACCOUNT INFORMATION */}
+                <div className="profile-section account-information-section">
+                  <div className="profile-section-heading">
+                    <p className="eyebrow">ACCOUNT INFORMATION</p>
+                  </div>
+
+                  <div className="settings-row">
+                    <span>Data storage</span>
+                    <strong>Supabase Cloud</strong>
+                  </div>
+
+                  <div className="settings-row">
+                    <span>Accounts</span>
+                    <strong>{accounts.length}</strong>
+                  </div>
+
+                  <div className="settings-row">
+                    <span>Transactions</span>
+                    <strong>{transactions.length}</strong>
+                  </div>
+
+                  <div className="settings-row">
+                    <span>Categories</span>
+                    <strong>{categories.length}</strong>
+                  </div>
+
+                  <div className="settings-row">
+                    <span>Cloud sync</span>
+                    <strong>
+                      {cloudError
+                        ? "Error"
+                        : isCloudReady
+                          ? "Connected"
+                          : "Connecting..."}
+                    </strong>
+                  </div>
+
+                  {cloudError && <p className="subheading">{cloudError}</p>}
                 </div>
 
-                <div className="settings-row">
-                  <span>Accounts</span>
-                  <strong>{accounts.length}</strong>
-                </div>
+                {/* LOGIN INFORMATION */}
+                <div className="profile-section account-security-section">
+                  <div className="profile-section-heading">
+                    <p className="eyebrow">ACCOUNT SECURITY</p>
+                  </div>
 
-                <div className="settings-row">
-                  <span>Transactions</span>
-                  <strong>{transactions.length}</strong>
-                </div>
+                  <div className="profile-login-activity">
+                    <div className="profile-section-heading">
+                      <span>LOGIN INFORMATION</span>
+                    </div>
 
-                <div className="settings-row">
-                  <span>Categories</span>
-                  <strong>{categories.length}</strong>
-                </div>
+                    <div className="login-activity-table">
+                      <div className="login-activity-head">
+                        <span>INFORMATION</span>
+                        <span>DETAIL</span>
+                      </div>
 
-                <div className="settings-row">
-                  <span>Cloud sync</span>
-                  <strong>
-                    {cloudError
-                      ? "Error"
-                      : isCloudReady
-                        ? "Connected"
-                        : "Connecting..."}
-                  </strong>
-                </div>
+                      <div className="login-activity-row">
+                        <span>Login Status</span>
+                        <span
+                          className={
+                            userId ? "session-active" : "session-inactive"
+                          }
+                        >
+                          {userId ? "Authenticated" : "Not signed in"}
+                        </span>
+                      </div>
 
-                {cloudError && <p className="subheading">{cloudError}</p>}
+                      <div className="login-activity-row">
+                        <span>Session Status</span>
+                        <span
+                          className={
+                            userId ? "session-active" : "session-inactive"
+                          }
+                        >
+                          {userId ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+
+                      <div className="login-activity-row">
+                        <span>Last Login</span>
+                        <span>{lastLoginLabel}</span>
+                      </div>
+
+                      <div className="login-activity-row">
+                        <span>Device</span>
+                        <span>{deviceLabel}</span>
+                      </div>
+
+                      <div className="login-activity-row">
+                        <span>Browser</span>
+                        <span>{browserLabel}</span>
+                      </div>
+                    </div>
+
+                    <div className="login-history-section">
+                      <div className="login-history-heading">
+                        <span>RECENT SIGN-INS</span>
+                        <span>{loginHistory.length} RECORDS</span>
+                      </div>
+
+                      <div className="login-history-table">
+                        <div className="login-history-table-head">
+                          <span>DATE</span>
+                          <span>DEVICE</span>
+                          <span>BROWSER</span>
+                          <span>STATUS</span>
+                        </div>
+
+                        {loginHistory.length > 0 ? (
+                          loginHistory.map((entry) => (
+                            <div
+                              className="login-history-table-row"
+                              key={entry.id}
+                            >
+                              <span>
+                                {new Date(entry.time).toLocaleString("id-ID", {
+                                  dateStyle: "short",
+                                  timeStyle: "short",
+                                })}
+                              </span>
+                              <span>{entry.device}</span>
+                              <span>{entry.browser}</span>
+                              <div className="login-history-actions">
+                                <span className="session-active">Success</span>
+
+                                <button
+                                  type="button"
+                                  className="login-history-delete"
+                                  onClick={() =>
+                                    handleDeleteLoginHistory(entry.id)
+                                  }
+                                  title="Delete login record"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="login-history-empty">
+                            No sign-in history available
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* CATEGORY SETTINGS */}
                 <div className="category-group">
@@ -8708,6 +9202,111 @@ function App() {
             <small>
               Pemrosesan dilakukan di perangkat. Tidak memakai API berbayar.
             </small>
+          </div>
+        </div>
+      )}
+      {showProfileModal && (
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            if (!isSavingProfile) setShowProfileModal(false);
+          }}
+        >
+          <div
+            className="account-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">ACCOUNT SETTINGS</p>
+                <h2>Edit Profile</h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setShowProfileModal(false)}
+                disabled={isSavingProfile}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={saveProfileName}>
+              <label htmlFor="profile-display-name">Display name</label>
+
+              <input
+                id="profile-display-name"
+                type="text"
+                value={profileNameInput}
+                onChange={(event) => setProfileNameInput(event.target.value)}
+                placeholder="Masukkan nama kamu"
+                maxLength={40}
+                required
+              />
+
+              <button
+                type="submit"
+                className="primary-button full-button"
+                disabled={isSavingProfile}
+              >
+                {isSavingProfile ? "Saving..." : "Save Changes"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {showEmailModal && (
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            if (!isUpdatingEmail) setShowEmailModal(false);
+          }}
+        >
+          <div
+            className="account-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">ACCOUNT SECURITY</p>
+                <h2>Change Email</h2>
+              </div>
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setShowEmailModal(false)}
+                disabled={isUpdatingEmail}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="subheading">
+              Masukkan alamat email baru untuk akun VILTURE Finance.
+            </p>
+
+            <form onSubmit={handleUpdateEmail}>
+              <label htmlFor="new-account-email">New Email Address</label>
+
+              <input
+                id="new-account-email"
+                type="email"
+                value={newEmail}
+                onChange={(event) => setNewEmail(event.target.value)}
+                placeholder="nama@email.com"
+                required
+              />
+
+              <button
+                type="submit"
+                className="primary-button full-button"
+                disabled={isUpdatingEmail}
+              >
+                {isUpdatingEmail ? "Sending..." : "Send Verification"}
+              </button>
+            </form>
           </div>
         </div>
       )}
