@@ -26,20 +26,17 @@ export async function sendLoginOtp(email: string) {
 
   if (sessionError) throw sessionError;
 
-  // Pertahankan UID akun anonim lama agar data tidak terputus.
+  // Jika masih menggunakan akun anonim,
+  // bersihkan sesi lokal sebelum login dengan email.
   if (session?.user.is_anonymous) {
-    console.log("OTP PATH: updateUser / email_change");
-    const { error } = await supabase.auth.updateUser({
-      email: normalizedEmail,
+    const { error: logoutError } = await supabase.auth.signOut({
+      scope: "local",
     });
 
-    if (error) throw error;
-
-    return { mode: "upgrade" as const };
+    if (logoutError) throw logoutError;
   }
 
-  // Login atau registrasi pengguna baru.
-  console.log("OTP PATH: signInWithOtp / magic_link_or_otp");
+  // Login atau registrasi menggunakan OTP.
   const { error } = await supabase.auth.signInWithOtp({
     email: normalizedEmail,
     options: {
